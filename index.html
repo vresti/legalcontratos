@@ -383,8 +383,10 @@ select.finp option{background:var(--bg2)}
 
       <!-- ═══ TAB: VISTA PREVIA ═══ -->
       <div id="tab-vista" style="display:none">
-        <div class="empty-state"><div class="es-icon">🖨</div><div class="es-title">Sin selección</div>
-        <div class="es-sub">Seleccioná un contrato desde "Mis contratos" para ver la vista previa.</div></div>
+        <div id="vista-content">
+          <div class="empty-state"><div class="es-icon">🖨</div><div class="es-title">Sin selección</div>
+          <div class="es-sub">Seleccioná un contrato desde "Mis contratos" con el botón 👁 Ver.</div></div>
+        </div>
       </div>
 
       <!-- ═══ TAB: DOCUMENTOS ═══ -->
@@ -826,7 +828,9 @@ async function loadDatosReales(){
     <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;color:var(--text3)">${esc(d.preview)}</td>
     <td><span class="badge ${badge}"><span class="badge-dot"></span>${d.estado}</span></td>
     <td>${esc(d.fecha)}</td>
-    <td style="white-space:nowrap;display:flex;gap:5px">${genBtn}
+    <td style="white-space:nowrap;display:flex;gap:5px">
+    <button class="tact" onclick="verContrato(${d.id})">👁 Ver</button>
+    ${genBtn}
     ${d.estado==='BORRADOR'?'<button class="tact" style="color:var(--red);border-color:transparent" onclick="eliminarContrato('+d.id+')">✕</button>':''}
     ${d.hash?'<button class="tact" title="'+esc(d.hash.slice(0,16))+'..." onclick="toast(\'Hash: '+esc(d.hash.slice(0,24))+'...\',\'inf\')">🔐</button>':''}
     </td></tr>`;
@@ -1032,6 +1036,106 @@ async function guardarYGenerar(){
 // ════════════════════════════════════════════════════════
 //  ACCIONES DESDE MIS CONTRATOS
 // ════════════════════════════════════════════════════════
+async function verContrato(id){
+  showLoading('Cargando contrato...');
+  // Cargar dato real
+  const r = await api({action:'getDatoReal',token:SESSION.token,id});
+  if(!r.ok){hideLoading();toast(r.error,'err');return;}
+  const item = r.item;
+  let datos = {};
+  try { datos = JSON.parse(item.datosJSON || '{}'); } catch(e) {}
+
+  // Cargar documento para obtener nombre y placeholders
+  const r2 = await api({action:'getDocumento',token:SESSION.token,id:item.documentoId});
+  hideLoading();
+
+  const docNombre = r2.ok ? r2.doc.nombre : 'Documento #'+item.documentoId;
+  const placeholders = r2.ok ? (r2.placeholders||[]) : [];
+
+  // Agrupar datos por grupo
+  const grupos = {};
+  placeholders.forEach(ph => {
+    const g = ph.grupo || 'GENERAL';
+    if (!grupos[g]) grupos[g] = [];
+    grupos[g].push(ph);
+  });
+
+  // Badge de estado
+  const badgeClass = {'BORRADOR':'badge-borr','LISTO':'badge-listo','IMPRESO':'badge-imp'}[item.estado]||'badge-borr';
+
+  // Construir vista
+  let html = '';
+
+  // Header
+  html += '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px;padding-bottom:16px;border-bottom:1px solid var(--border)">';
+  html += '<div>';
+  html += '<div style="font-family:var(--mono);font-size:20px;font-weight:700;color:var(--text)">Contrato #'+item.id+'</div>';
+  html += '<div style="font-size:14px;font-weight:600;color:var(--text2);margin-top:2px">'+esc(docNombre)+'</div>';
+  html += '<div style="font-size:11px;color:var(--text3);margin-top:4px;line-height:1.7">';
+  html += 'Cargado: '+esc(item.fecha)+' · Renglón: '+item.renglon;
+  if(item.ordenGlobal) html += ' · Orden: '+item.ordenGlobal;
+  html += '</div></div>';
+  html += '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">';
+  html += '<span class="badge '+badgeClass+'"><span class="badge-dot"></span>'+item.estado+'</span>';
+  if(item.estado==='BORRADOR'){
+    html += '<button class="fab fab-green" onclick="generarUno('+id+')" style="padding:7px 14px;font-size:11px">🖨 Generar definitivo</button>';
+  }
+  if(item.hash){
+    html += '<span style="font-size:10px;color:var(--text3);font-family:var(--mono)">🔐 '+esc(item.hash.slice(0,20))+'...</span>';
+  }
+  html += '<button class="fab fab-ghost" onclick="goTab(\'contratos\')" style="padding:7px 14px;font-size:11px">← Volver</button>';
+  html += '</div></div>';
+
+  // Datos agrupados
+  for (const [grupo, phs] of Object.entries(grupos)) {
+    html += '<div style="margin-bottom:16px">';
+    html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">';
+    html += '<span class="grupo-chip">'+esc(grupo)+'</span></div>';
+    html += '<div style="background:var(--bg1);border:1px solid var(--border);border-radius:10px;overflow:hidden">';
+    html += '<table class="tbl"><tbody>';
+    phs.forEach(ph => {
+      const val = datos[ph.codigo] || '';
+      const isEmpty = !val;
+      html += '<tr>';
+      html += '<td style="width:200px;font-size:10px;color:var(--text3)">'+esc(ph.etiqueta || ph.codigo)+'</td>';
+      html += '<td style="font-family:var(--mono);font-size:10px;color:var(--cyan);width:220px">'+esc(ph.codigo)+'</td>';
+      html += '<td style="font-weight:600;color:'+(isEmpty?'var(--text3)':'var(--text)')+'">'+(isEmpty?'<em style="font-weight:400">— vacío —</em>':esc(val))+'</td>';
+      html += '</tr>';
+    });
+    html += '</tbody></table></div></div>';
+  }
+
+  // Campos que no tienen placeholder definido (si hay extras en el JSON)
+  const phCodigos = placeholders.map(p => p.codigo);
+  const extras = Object.entries(datos).filter(([k]) => !phCodigos.includes(k));
+  if(extras.length){
+    html += '<div style="margin-bottom:16px">';
+    html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">';
+    html += '<span class="grupo-chip" style="background:var(--bg3);color:var(--text3)">OTROS</span></div>';
+    html += '<div style="background:var(--bg1);border:1px solid var(--border);border-radius:10px;overflow:hidden">';
+    html += '<table class="tbl"><tbody>';
+    extras.forEach(([k,v]) => {
+      html += '<tr><td style="font-family:var(--mono);font-size:10px;color:var(--cyan)">'+esc(k)+'</td>';
+      html += '<td style="font-weight:600">'+esc(v)+'</td></tr>';
+    });
+    html += '</tbody></table></div></div>';
+  }
+
+  // Info de impresión si ya se generó
+  if(item.estado==='IMPRESO'){
+    html += '<div style="background:var(--greenbg);border:1px solid rgba(34,197,94,.2);border-radius:10px;padding:14px;margin-top:12px">';
+    html += '<div style="font-size:11px;color:var(--green);font-weight:600;margin-bottom:6px">✓ Contrato generado</div>';
+    html += '<div style="font-size:11px;color:var(--text2);line-height:1.7">';
+    if(item.fechaImpresion) html += 'Fecha: '+esc(item.fechaImpresion)+'<br>';
+    if(item.copias) html += 'Copias: '+item.copias+' ejemplares<br>';
+    if(item.hash) html += 'Hash: <span style="font-family:var(--mono);font-size:10px">'+esc(item.hash)+'</span>';
+    html += '</div></div>';
+  }
+
+  document.getElementById('vista-content').innerHTML = html;
+  goTab('vista');
+}
+
 async function generarUno(id){
   showModal('🖨','¿Generar contrato?','Se generará el PDF con merge, hash y QR.\nRecibirás el documento por email.',async()=>{
     closeModal();showLoading('Generando contrato...');
