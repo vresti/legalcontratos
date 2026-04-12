@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>LegalContratos · Contratos Legales</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+/* ═══════════════ VARIABLES ═══════════════ */
+:root{
+  --bg0:#0b0e14;--bg1:#141820;--bg2:#1c2230;--bg3:#232b3b;
+  --border:#2a3347;--border2:#374159;
+  --text:#d4dbe8;--text2:#8a96aa;--text3:#56627a;
+  --green:#22c55e;--greend:#16a34a;--greenbg:rgba(34,197,94,.12);
+  --gold:#e4aa22;--goldbg:rgba(228,170,34,.12);
+  --blue:#3b82f6;--bluebg:rgba(59,130,246,.12);
+  --red:#ef4444;--redbg:rgba(239,68,68,.12);
+  --amber:#f59e0b;--amberbg:rgba(245,158,11,.12);
+  --cyan:#06b6d4;--cyanbg:rgba(6,182,212,.12);
+  --r:9px;--font:'Inter',system-ui,sans-serif;--mono:'JetBrains Mono',monospace;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;font-family:var(--font);background:var(--bg0);color:var(--text);font-size:13px;line-height:1.5;-webkit-font-smoothing:antialiased}
+input,select,textarea,button{font-family:var(--font);font-size:13px}
+button{cursor:pointer}a{color:var(--blue);text-decoration:none}
+
+/* ═══════════════ LOGIN ═══════════════ */
+#screen-login{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;background:radial-gradient(ellipse 60% 50% at 30% 40%,rgba(59,130,246,.06),transparent),var(--bg0)}
+.login-card{width:100%;max-width:400px;background:var(--bg1);border:1px solid var(--border);border-radius:16px;overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,.5)}
+.login-head{background:linear-gradient(135deg,#1a2744,#1e3a5f);padding:26px 26px 22px}
+.lh-icon{font-size:34px;margin-bottom:8px}
+.lh-title{font-size:19px;font-weight:700;color:#fff;letter-spacing:-.3px}
+.lh-sub{font-size:11px;color:#93c5fd;margin-top:3px}
+.login-body{padding:26px}
+.step-title{font-size:13px;font-weight:600;margin-bottom:3px}
+.step-sub{font-size:11px;color:var(--text3);margin-bottom:18px;line-height:1.6}
+.linp{width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 13px;color:var(--text);outline:none;transition:border-color .15s}
+.linp:focus{border-color:var(--blue)}
+.linp::placeholder{color:var(--text3);font-size:11px}
+.lbtn{width:100%;padding:11px;border-radius:8px;border:none;background:var(--blue);color:#fff;font-weight:600;margin-top:12px;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:8px}
+.lbtn:hover{filter:brightness(1.1)}
+.lbtn:disabled{opacity:.4;pointer-events:none}
+.lbtn-ghost{background:transparent;color:var(--text3);font-size:11px;font-weight:400;margin-top:10px;padding:6px;border:none;width:100%;cursor:pointer}
+.otp-wrap{display:flex;gap:8px;justify-content:center;margin:4px 0 18px}
+.otp-inp{width:46px;height:54px;background:var(--bg2);border:2px solid var(--border);border-radius:10px;text-align:center;font-size:24px;font-weight:700;color:var(--blue);font-family:var(--mono);outline:none;transition:border-color .15s;caret-color:transparent}
+.otp-inp:focus{border-color:var(--blue);background:var(--bg3)}
+.otp-inp.filled{border-color:rgba(59,130,246,.4)}
+.lerr{display:none;background:var(--redbg);border:1px solid rgba(239,68,68,.25);border-radius:7px;padding:8px 12px;font-size:11px;color:var(--red);margin-top:12px;text-align:center}
+.lerr.show{display:block}
+.login-foot{padding:13px 26px;border-top:1px solid var(--border);font-size:10px;color:var(--text3);text-align:center}
+
+/* ═══════════════ APP SHELL ═══════════════ */
+#screen-app{display:none;height:100vh;overflow:hidden}
+#screen-app.visible{display:flex}
+.sidebar{width:268px;flex-shrink:0;background:var(--bg1);border-right:1px solid var(--border);display:flex;flex-direction:column}
+.sb-scroll{flex:1;overflow-y:auto;overflow-x:hidden}
+.sb-scroll::-webkit-scrollbar{width:3px}
+.sb-scroll::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+.brand{padding:15px;border-bottom:1px solid var(--border)}
+.brand-row{display:flex;align-items:center;gap:10px;margin-bottom:7px}
+.brand-icon{width:34px;height:34px;flex-shrink:0;border-radius:8px;background:linear-gradient(135deg,#1a2744,#1e3a5f);display:flex;align-items:center;justify-content:center;font-size:17px;box-shadow:0 4px 12px rgba(26,39,68,.35)}
+.brand-name{font-size:13px;font-weight:700;letter-spacing:-.2px}
+.brand-sub{font-size:10px;color:var(--text3)}
+.vpill{display:inline-flex;align-items:center;gap:5px;background:var(--bg2);border:1px solid var(--border);border-radius:20px;padding:2px 8px;font-size:10px;color:var(--text3);font-family:var(--mono)}
+.dot{width:5px;height:5px;border-radius:50%;background:var(--blue);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.user-card{margin:10px;padding:11px;background:var(--bg2);border:1px solid var(--border);border-radius:9px}
+.uc-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}
+.uc-name{font-size:12px;font-weight:600}.uc-email{font-size:10px;color:var(--text3)}
+.uc-badge{font-size:9px;padding:2px 7px;border-radius:10px;font-weight:600;font-family:var(--mono)}
+.uc-badge.admin{background:var(--goldbg);color:var(--gold);border:1px solid rgba(228,170,34,.25)}
+.uc-badge.pro{background:var(--bluebg);color:var(--blue);border:1px solid rgba(59,130,246,.25)}
+.uc-badge.user{background:var(--bg2);color:var(--text3);border:1px solid var(--border)}
+.cupo-lbl{display:flex;justify-content:space-between;font-size:10px;margin-bottom:4px}
+.cupo-lbl span:first-child{color:var(--text2)}.cupo-val{font-family:var(--mono);font-weight:600}
+.cupo-bar{height:4px;background:var(--border);border-radius:2px;overflow:hidden}
+.cupo-fill{height:100%;border-radius:2px;transition:width .4s;background:var(--blue)}
+.cupo-fill.warn{background:var(--amber)}.cupo-fill.danger{background:var(--red)}
+.cupo-disp{font-size:10px;color:var(--text3);margin-top:3px;text-align:right}
+.nav{padding:8px 10px 0}
+.nav-lbl{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text3);padding:0 4px;margin-bottom:5px;display:flex;align-items:center;gap:6px}
+.nav-lbl::after{content:'';flex:1;height:1px;background:var(--border)}
+.nav-btn{display:flex;align-items:center;gap:8px;width:100%;padding:8px 10px;border-radius:7px;border:none;background:transparent;color:var(--text2);font-size:12px;font-weight:500;transition:all .15s;margin-bottom:2px;text-align:left}
+.nav-btn:hover{background:var(--bg2);color:var(--text)}
+.nav-btn.active{background:var(--bluebg);color:var(--blue);border:1px solid rgba(59,130,246,.2)}
+.nav-icon{font-size:14px;width:16px;text-align:center;flex-shrink:0}
+.nav-badge{margin-left:auto;background:var(--amber);color:#0b0e14;font-size:9px;font-weight:700;border-radius:10px;padding:2px 8px;font-family:var(--mono);display:none;white-space:nowrap}
+.nav-badge.show{display:inline}
+.sb-footer{padding:11px 14px;border-top:1px solid var(--border)}
+.logout-btn{display:flex;align-items:center;gap:6px;padding:7px 10px;border-radius:7px;background:transparent;border:1px solid var(--border);color:var(--text3);font-size:11px;transition:all .15s;width:100%}
+.logout-btn:hover{border-color:var(--red);color:var(--red)}
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.topbar{padding:11px 20px;background:var(--bg1);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.topbar-title{font-size:13px;font-weight:600}
+.content{flex:1;overflow-y:auto;padding:20px 22px}
+.content::-webkit-scrollbar{width:5px}
+.content::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+
+/* ═══════════════ FORMS ═══════════════ */
+.form-section{margin-bottom:20px;max-width:900px}
+.fsec-lbl{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--text3);display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.fsec-lbl::after{content:'';flex:1;height:1px;background:var(--border)}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form-grid.cols3{grid-template-columns:1fr 1fr 1fr}
+.form-grid.cols4{grid-template-columns:1fr 1fr 1fr 1fr}
+.fg{display:flex;flex-direction:column;gap:4px}
+.fg.span2{grid-column:1/-1}
+.flbl{font-size:10px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;display:flex;align-items:center;gap:4px}
+.flbl .req{color:var(--red)}.flbl .opt{color:var(--text3);font-size:9px;font-weight:400;text-transform:none}
+.finp{background:var(--bg2);border:1px solid var(--border);border-radius:7px;padding:8px 11px;color:var(--text);font-size:12px;outline:none;transition:border-color .15s;width:100%}
+.finp:focus{border-color:var(--blue);background:var(--bg3)}
+.finp::placeholder{color:var(--text3);font-size:11px}
+select.finp option{background:var(--bg2)}
+
+/* ═══════════════ TABLES ═══════════════ */
+.tbl-wrap{background:var(--bg1);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.tbl{width:100%;border-collapse:collapse}
+.tbl th{background:var(--bg2);padding:8px 13px;text-align:left;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--text3);border-bottom:1px solid var(--border);white-space:nowrap}
+.tbl td{padding:9px 13px;border-bottom:1px solid rgba(42,51,71,.4);font-size:11px;color:var(--text2);vertical-align:middle}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tr:hover td{background:rgba(255,255,255,.02);color:var(--text)}
+.tbl .mono{font-family:var(--mono);font-size:12px;color:var(--text);font-weight:600}
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:10px;font-size:10px;font-weight:600;font-family:var(--mono);white-space:nowrap}
+.badge-borr{background:var(--amberbg);color:var(--amber);border:1px solid rgba(245,158,11,.2)}
+.badge-listo{background:var(--bluebg);color:var(--blue);border:1px solid rgba(59,130,246,.2)}
+.badge-imp{background:var(--greenbg);color:var(--green);border:1px solid rgba(34,197,94,.2)}
+.badge-dot{width:5px;height:5px;border-radius:50%;background:currentColor}
+.empty-tbl{text-align:center!important;padding:36px!important;color:var(--text3)!important;font-size:12px!important}
+.tact{padding:5px 11px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--text2);font-size:10px;font-weight:600;transition:all .15s;white-space:nowrap;cursor:pointer}
+.tact:hover{border-color:var(--blue);color:var(--blue)}
+
+/* ═══════════════ BUTTONS ═══════════════ */
+.fab{padding:9px 18px;border-radius:8px;border:none;font-size:12px;font-weight:600;display:flex;align-items:center;gap:7px;transition:all .15s;cursor:pointer}
+.fab-blue{background:var(--blue);color:#fff}.fab-blue:hover{filter:brightness(1.1)}
+.fab-green{background:var(--greend);color:#fff}.fab-green:hover{background:var(--green)}
+.fab-ghost{background:var(--bg2);color:var(--text2);border:1px solid var(--border)}.fab-ghost:hover{color:var(--text);border-color:var(--border2)}
+.fab:disabled{opacity:.4;pointer-events:none}
+.tbtn{padding:6px 13px;border-radius:6px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--bg2);color:var(--text2);display:flex;align-items:center;gap:5px;transition:all .15s;cursor:pointer}
+.tbtn:hover{border-color:var(--border2);color:var(--text)}
+
+/* ═══════════════ TABS / SUBTABS ═══════════════ */
+.subtabs{display:flex;gap:3px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:3px;margin-bottom:16px;max-width:500px}
+.subtab{flex:1;padding:7px 12px;border-radius:6px;border:none;background:transparent;color:var(--text3);font-size:11px;font-weight:600;transition:all .15s;cursor:pointer;text-align:center}
+.subtab:hover{color:var(--text2)}
+.subtab.active{background:var(--bg3);color:var(--text);box-shadow:0 2px 8px rgba(0,0,0,.3)}
+
+/* ═══════════════ MODAL / LOADING / TOAST ═══════════════ */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(3px);z-index:1000;align-items:center;justify-content:center}
+.overlay.show{display:flex}
+.modal{background:var(--bg1);border:1px solid var(--border);border-radius:14px;padding:26px;max-width:500px;width:90%;box-shadow:0 24px 60px rgba(0,0,0,.5)}
+.modal-icon{font-size:34px;margin-bottom:10px;text-align:center}
+.modal-title{font-size:15px;font-weight:700;margin-bottom:7px;text-align:center}
+.modal-msg{font-size:12px;color:var(--text2);text-align:center;line-height:1.6;margin-bottom:20px;white-space:pre-line}
+.modal-btns{display:flex;gap:8px}
+.mbtn{flex:1;padding:9px;border-radius:7px;font-size:12px;font-weight:600;border:none;transition:all .15s;cursor:pointer}
+.mbtn-confirm{background:var(--blue);color:#fff}.mbtn-confirm:hover{filter:brightness(1.1)}
+.mbtn-cancel{background:var(--bg2);color:var(--text2);border:1px solid var(--border)}.mbtn-cancel:hover{color:var(--text)}
+.loading-overlay{display:none;position:fixed;inset:0;background:rgba(11,14,20,.7);z-index:2000;align-items:center;justify-content:center;flex-direction:column;gap:14px}
+.loading-overlay.show{display:flex}
+.spinner{width:38px;height:38px;border-radius:50%;border:3px solid var(--border2);border-top-color:var(--blue);animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-msg{font-size:12px;color:var(--text3)}
+.toast-container{position:fixed;bottom:18px;right:18px;z-index:3000;display:flex;flex-direction:column;gap:7px;pointer-events:none}
+.toast{background:var(--bg1);border:1px solid var(--border);border-radius:8px;padding:9px 14px;font-size:11px;font-weight:500;max-width:300px;box-shadow:0 8px 24px rgba(0,0,0,.4);animation:slideIn .2s ease;pointer-events:all;display:flex;align-items:center;gap:7px}
+.toast-ok{border-color:rgba(34,197,94,.3);color:var(--green)}
+.toast-err{border-color:rgba(239,68,68,.3);color:var(--red)}
+.toast-inf{border-color:var(--border2);color:var(--text2)}
+@keyframes slideIn{from{transform:translateX(16px);opacity:0}to{transform:none;opacity:1}}
+.spin-inline{width:11px;height:11px;border-radius:50%;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;animation:spin .7s linear infinite;display:inline-block}
+
+/* ═══════════════ EMPTY STATES ═══════════════ */
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;gap:12px;color:var(--text3);text-align:center}
+.es-icon{font-size:44px;opacity:.2}.es-title{font-size:15px;font-weight:600;color:var(--text2)}
+.es-sub{font-size:12px;max-width:300px;line-height:1.6}
+
+/* ═══════════════ ABM MODAL ═══════════════ */
+.abm-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);backdrop-filter:blur(4px);z-index:1500;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto}
+.abm-overlay.show{display:flex}
+.abm-modal{background:var(--bg1);border:1px solid var(--border2);border-radius:16px;width:100%;max-width:900px;margin:auto;box-shadow:0 32px 80px rgba(0,0,0,.5);overflow:hidden}
+.abm-head{padding:18px 24px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.abm-title{font-size:15px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:10px}
+.abm-close{width:30px;height:30px;border-radius:7px;border:1px solid var(--border);background:var(--bg3);color:var(--text3);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;transition:all .15s}
+.abm-close:hover{color:var(--red);border-color:var(--red)}
+.abm-body{padding:20px 24px}
+.abm-tbl{width:100%;border-collapse:collapse;margin-bottom:20px}
+.abm-tbl th{background:var(--bg2);padding:8px 12px;text-align:left;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--text3);border-bottom:1px solid var(--border)}
+.abm-tbl td{padding:9px 12px;border-bottom:1px solid rgba(42,51,71,.4);font-size:11px;color:var(--text2);vertical-align:middle}
+.abm-form{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:18px;margin-top:8px}
+.abm-form-title{font-size:11px;font-weight:700;color:var(--text2);margin-bottom:14px}
+.abm-form-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+.abm-fg{display:flex;flex-direction:column;gap:4px}
+.abm-lbl{font-size:9px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.4px}
+.abm-inp{background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:7px 10px;color:var(--text);font-size:11px;outline:none;width:100%;transition:border-color .15s}
+.abm-inp:focus{border-color:var(--blue)}
+.abm-chk-row{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text2);margin-top:4px}
+.abm-chk-row input{width:14px;height:14px;accent-color:var(--blue)}
+.abm-btn{padding:8px 18px;border-radius:7px;font-size:12px;font-weight:600;border:none;cursor:pointer;transition:all .15s}
+.abm-btn-save{background:var(--blue);color:#fff}.abm-btn-save:hover{filter:brightness(1.1)}
+.abm-btn-cancel{background:var(--bg3);color:var(--text2);border:1px solid var(--border)}.abm-btn-cancel:hover{color:var(--text)}
+.abm-btn-new{background:var(--bg3);color:var(--blue);border:1px solid rgba(59,130,246,.3);font-size:11px;padding:6px 14px;cursor:pointer}
+.grupo-chip{display:inline-flex;padding:2px 8px;border-radius:4px;font-size:9px;font-family:var(--mono);font-weight:600;background:var(--cyanbg);color:var(--cyan);border:1px solid rgba(6,182,212,.2)}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ LOGIN ═══════════════ -->
+<div id="screen-login">
+  <div class="login-card">
+    <div class="login-head">
+      <div class="lh-icon">📑</div>
+      <div class="lh-title">LegalContratos</div>
+      <div class="lh-sub">Mail-merge de contratos legales · Argentina</div>
+    </div>
+    <div class="login-body">
+      <div id="ls1">
+        <div class="step-title">Identificación</div>
+        <div class="step-sub">Ingresá tu correo para recibir el código de acceso.</div>
+        <input id="inp-email" class="linp" type="email" placeholder="usuario@gmail.com" autocomplete="email" onkeydown="if(event.key==='Enter')sendCode()"/>
+        <button class="lbtn" id="btn-send" onclick="sendCode()">Enviar código</button>
+        <div id="lerr1" class="lerr"></div>
+      </div>
+      <div id="ls2" style="display:none">
+        <div class="step-title">Verificación</div>
+        <div class="step-sub" id="ls2-sub">Ingresá el código de 6 dígitos enviado a tu correo.</div>
+        <div class="otp-wrap">
+          <input class="otp-inp" id="otp0" maxlength="1" type="text" inputmode="numeric"/>
+          <input class="otp-inp" id="otp1" maxlength="1" type="text" inputmode="numeric"/>
+          <input class="otp-inp" id="otp2" maxlength="1" type="text" inputmode="numeric"/>
+          <input class="otp-inp" id="otp3" maxlength="1" type="text" inputmode="numeric"/>
+          <input class="otp-inp" id="otp4" maxlength="1" type="text" inputmode="numeric"/>
+          <input class="otp-inp" id="otp5" maxlength="1" type="text" inputmode="numeric"/>
+        </div>
+        <button class="lbtn" id="btn-verify" onclick="verifyCode()">Ingresar</button>
+        <button class="lbtn-ghost" onclick="backToStep1()">← Cambiar email</button>
+        <div id="lerr2" class="lerr"></div>
+      </div>
+    </div>
+    <div class="login-foot">LegalContratos · app.legalcontratos.com</div>
+  </div>
+</div>
+
+<!-- ═══════════════ REGISTRO ═══════════════ -->
+<div class="overlay" id="register-overlay">
+  <div class="modal">
+    <div class="modal-icon">👤</div>
+    <div class="modal-title">Nuevo usuario</div>
+    <div class="modal-msg" style="text-align:left;margin-bottom:14px">
+      Tu correo no está registrado. Ingresá tu nombre para crear tu cuenta con <strong style="color:var(--blue)">5 créditos gratuitos</strong>.
+    </div>
+    <div style="margin-bottom:16px">
+      <label class="abm-lbl" style="margin-bottom:5px;display:block">Nombre y Apellido</label>
+      <input id="reg-nombre" class="linp" type="text" placeholder="Juan García" onkeydown="if(event.key==='Enter')confirmarRegistro()"/>
+    </div>
+    <div class="modal-btns">
+      <button class="mbtn mbtn-cancel" onclick="document.getElementById('register-overlay').classList.remove('show')">Cancelar</button>
+      <button class="mbtn mbtn-confirm" id="btn-reg-confirm" onclick="confirmarRegistro()">Crear cuenta</button>
+    </div>
+    <div id="reg-err" class="lerr" style="margin-top:10px"></div>
+  </div>
+</div>
+
+<!-- ═══════════════ APP ═══════════════ -->
+<div id="screen-app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-row">
+        <div class="brand-icon">📑</div>
+        <div><div class="brand-name">LegalContratos</div><div class="brand-sub">Contratos legales</div></div>
+      </div>
+      <span class="vpill"><span class="dot"></span>v1.0 · 2026</span>
+    </div>
+    <div class="sb-scroll">
+      <div style="padding:10px 10px 0">
+        <div class="user-card">
+          <div class="uc-row">
+            <div><div class="uc-name" id="uc-name">–</div><div class="uc-email" id="uc-email">–</div></div>
+            <span class="uc-badge" id="uc-badge">–</span>
+          </div>
+          <div class="cupo-lbl"><span>Créditos</span><span class="cupo-val" id="cupo-val">–/–</span></div>
+          <div class="cupo-bar"><div class="cupo-fill" id="cupo-fill" style="width:0%"></div></div>
+          <div class="cupo-disp" id="cupo-disp">–</div>
+        </div>
+      </div>
+      <div class="nav" style="margin-top:7px">
+        <div class="nav-lbl">Módulos</div>
+        <button class="nav-btn active" id="nav-contratos" onclick="goTab('contratos')"><span class="nav-icon">📋</span>Mis contratos<span class="nav-badge" id="badge-borr">0</span></button>
+        <button class="nav-btn" id="nav-nuevo" onclick="goTab('nuevo')"><span class="nav-icon">📝</span>Nuevo contrato</button>
+        <button class="nav-btn" id="nav-vista" onclick="goTab('vista')"><span class="nav-icon">🖨</span>Vista previa</button>
+        <div class="nav-lbl" style="margin-top:10px">Configuración</div>
+        <button class="nav-btn" id="nav-docs" onclick="goTab('docs')"><span class="nav-icon">📄</span>Documentos</button>
+        <button class="nav-btn" id="nav-placeholders" onclick="goTab('placeholders')"><span class="nav-icon">🔧</span>Placeholders</button>
+      </div>
+    </div>
+    <div class="sb-footer">
+      <button class="logout-btn" onclick="logout()">⏻&nbsp;&nbsp;Cerrar sesión</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <span class="topbar-title" id="topbar-title">Mis contratos</span>
+      <div style="display:flex;align-items:center;gap:12px">
+        <button id="btn-abm" onclick="openABM()" style="display:none;padding:6px 13px;border-radius:7px;border:1px solid rgba(59,130,246,.3);background:var(--bluebg);color:var(--blue);font-size:11px;font-weight:600;cursor:pointer">👥 Usuarios</button>
+        <div id="topbar-right" style="display:flex;gap:7px"></div>
+      </div>
+    </div>
+    <div class="content" id="content">
+
+      <!-- ═══ TAB: MIS CONTRATOS ═══ -->
+      <div id="tab-contratos">
+        <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+          <div class="subtabs" style="max-width:400px">
+            <button class="subtab active" onclick="setEstadoFilter('TODOS',this)">Todos</button>
+            <button class="subtab" onclick="setEstadoFilter('BORRADOR',this)">Borrador</button>
+            <button class="subtab" onclick="setEstadoFilter('IMPRESO',this)">Impreso</button>
+          </div>
+          <button class="tbtn" onclick="loadDatosReales()">↺ Actualizar</button>
+        </div>
+        <div class="tbl-wrap">
+          <table class="tbl"><thead><tr><th>#</th><th>Documento</th><th>Datos principales</th><th>Estado</th><th>Fecha</th><th></th></tr></thead>
+          <tbody id="contratos-tbody"><tr><td colspan="6" class="empty-tbl">Cargando...</td></tr></tbody></table>
+        </div>
+      </div>
+
+      <!-- ═══ TAB: NUEVO CONTRATO ═══ -->
+      <div id="tab-nuevo" style="display:none">
+        <div class="empty-state"><div class="es-icon">📝</div><div class="es-title">Nuevo contrato</div>
+        <div class="es-sub">Primero configurá tus Documentos y Placeholders en las secciones de Configuración. Luego podrás cargar datos y generar contratos.</div>
+        <button class="fab fab-blue" onclick="goTab('docs')">📄 Ir a Documentos</button></div>
+      </div>
+
+      <!-- ═══ TAB: VISTA PREVIA ═══ -->
+      <div id="tab-vista" style="display:none">
+        <div class="empty-state"><div class="es-icon">🖨</div><div class="es-title">Sin selección</div>
+        <div class="es-sub">Seleccioná un contrato desde "Mis contratos" para ver la vista previa.</div></div>
+      </div>
+
+      <!-- ═══ TAB: DOCUMENTOS ═══ -->
+      <div id="tab-docs" style="display:none">
+        <div style="display:flex;gap:8px;margin-bottom:14px">
+          <button class="fab fab-blue" onclick="crearDocTemplate()">📄 Crear nuevo documento</button>
+          <button class="tbtn" onclick="loadDocumentos()">↺ Actualizar</button>
+        </div>
+        <div class="form-section">
+          <div class="fsec-lbl">Registrar template existente</div>
+          <div class="form-grid cols3">
+            <div class="fg"><label class="flbl">ID Google Doc <span class="req">*</span></label><input class="finp" id="doc-gid" placeholder="Pegá el ID del documento"/></div>
+            <div class="fg"><label class="flbl">Nombre <span class="req">*</span></label><input class="finp" id="doc-nombre" placeholder="Ej: Boleto compraventa"/></div>
+            <div class="fg"><label class="flbl">Copias default</label><input class="finp" id="doc-copias" type="number" min="1" value="3" style="max-width:80px"/></div>
+          </div>
+          <div class="fg" style="margin-top:8px"><label class="flbl">Placeholder IDs <span class="opt">(separados por ;)</span></label><input class="finp" id="doc-phids" placeholder="1;2;3;4;5 — IDs de PlaceholdersContratos"/></div>
+          <div class="fg" style="margin-top:8px"><label class="flbl">Descripción</label><input class="finp" id="doc-desc" placeholder="Descripción del contrato"/></div>
+          <div style="margin-top:10px"><button class="fab fab-blue" onclick="registrarDocumento()">💾 Registrar</button></div>
+        </div>
+        <div class="form-section">
+          <div class="fsec-lbl">Mis documentos</div>
+          <div class="tbl-wrap">
+            <table class="tbl"><thead><tr><th>#</th><th>Nombre</th><th>Placeholders</th><th>Copias</th><th>Estado</th><th>Fecha</th><th></th></tr></thead>
+            <tbody id="docs-tbody"><tr><td colspan="7" class="empty-tbl">Sin documentos</td></tr></tbody></table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ TAB: PLACEHOLDERS ═══ -->
+      <div id="tab-placeholders" style="display:none">
+        <div class="subtabs">
+          <button class="subtab active" id="st-globales" onclick="showPHTab('globales')">🌐 Globales</button>
+          <button class="subtab" id="st-contratos" onclick="showPHTab('contratos')">📋 Contratos</button>
+        </div>
+
+        <!-- Subtab: Globales -->
+        <div id="ph-globales">
+          <div style="display:flex;gap:8px;margin-bottom:14px">
+            <button class="fab fab-blue" onclick="openPHGForm()">+ Nuevo global</button>
+            <button class="tbtn" onclick="loadPHGlobales()">↺ Actualizar</button>
+          </div>
+          <div class="tbl-wrap">
+            <table class="tbl"><thead><tr><th>Código</th><th>Nombre</th><th>Tipo</th><th>Default</th><th></th></tr></thead>
+            <tbody id="phg-tbody"><tr><td colspan="5" class="empty-tbl">Cargando...</td></tr></tbody></table>
+          </div>
+          <div id="phg-form" class="abm-form" style="display:none;margin-top:12px">
+            <div class="abm-form-title" id="phg-form-title">Nuevo placeholder global</div>
+            <input type="hidden" id="phg-fila"/>
+            <div class="abm-form-grid">
+              <div class="abm-fg"><label class="abm-lbl">Código *</label><input class="abm-inp" id="phg-codigo" placeholder="{{MI_VARIABLE}}"/></div>
+              <div class="abm-fg"><label class="abm-lbl">Nombre</label><input class="abm-inp" id="phg-nombre" placeholder="Nombre descriptivo"/></div>
+              <div class="abm-fg"><label class="abm-lbl">Tipo</label><select class="abm-inp" id="phg-tipo"><option>texto</option><option>fecha</option><option>hora</option><option>numero</option></select></div>
+              <div class="abm-fg"><label class="abm-lbl">Valor default</label><input class="abm-inp" id="phg-default" placeholder="auto o valor fijo"/></div>
+              <div class="abm-fg"><label class="abm-lbl">Descripción</label><input class="abm-inp" id="phg-desc"/></div>
+            </div>
+            <div style="display:flex;gap:8px;justify-content:flex-end">
+              <button class="abm-btn abm-btn-cancel" onclick="document.getElementById('phg-form').style.display='none'">Cancelar</button>
+              <button class="abm-btn abm-btn-save" onclick="savePHGlobal()">💾 Guardar</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Subtab: Contratos -->
+        <div id="ph-contratos" style="display:none">
+          <div style="display:flex;gap:8px;margin-bottom:14px">
+            <button class="fab fab-blue" onclick="openPHCForm()">+ Nuevo placeholder</button>
+            <button class="tbtn" onclick="loadPHContratos()">↺ Actualizar</button>
+          </div>
+          <div class="tbl-wrap">
+            <table class="tbl"><thead><tr><th>ID</th><th>Código</th><th>Grupo</th><th>Etiqueta</th><th>Tipo</th><th>Oblig.</th><th></th></tr></thead>
+            <tbody id="phc-tbody"><tr><td colspan="7" class="empty-tbl">Cargando...</td></tr></tbody></table>
+          </div>
+          <div id="phc-form" class="abm-form" style="display:none;margin-top:12px">
+            <div class="abm-form-title" id="phc-form-title">Nuevo placeholder de contrato</div>
+            <input type="hidden" id="phc-fila"/><input type="hidden" id="phc-id"/>
+            <div class="abm-form-grid">
+              <div class="abm-fg"><label class="abm-lbl">Código *</label><input class="abm-inp" id="phc-codigo" placeholder="{{GRUPO_CAMPO}}"/></div>
+              <div class="abm-fg"><label class="abm-lbl">Grupo *</label><input class="abm-inp" id="phc-grupo" placeholder="COMPRADOR" style="text-transform:uppercase"/></div>
+              <div class="abm-fg"><label class="abm-lbl">Alias</label><input class="abm-inp" id="phc-alias" placeholder="Datos del comprador"/></div>
+              <div class="abm-fg"><label class="abm-lbl">Etiqueta</label><input class="abm-inp" id="phc-etiqueta" placeholder="Nombre y Apellido"/></div>
+              <div class="abm-fg"><label class="abm-lbl">Tipo</label><select class="abm-inp" id="phc-tipo"><option>texto</option><option>numero</option><option>fecha</option><option>moneda</option></select></div>
+              <div class="abm-fg"><label class="abm-lbl">Orden</label><input class="abm-inp" id="phc-orden" type="number" min="0" value="0"/></div>
+              <div class="abm-fg" style="justify-content:flex-end"><div class="abm-chk-row"><input type="checkbox" id="phc-oblig"/><label for="phc-oblig">Obligatorio</label></div></div>
+            </div>
+            <div style="display:flex;gap:8px;justify-content:flex-end">
+              <button class="abm-btn abm-btn-cancel" onclick="document.getElementById('phc-form').style.display='none'">Cancelar</button>
+              <button class="abm-btn abm-btn-save" onclick="savePHContrato()">💾 Guardar</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<!-- ABM Usuarios -->
+<div class="abm-overlay" id="abm-overlay">
+  <div class="abm-modal">
+    <div class="abm-head"><span class="abm-title">👥 Gestión de Usuarios</span>
+      <div style="display:flex;gap:8px"><button class="abm-btn-new" onclick="abrirFormNuevoUsr()">+ Nuevo</button><button class="abm-close" onclick="document.getElementById('abm-overlay').classList.remove('show')">✕</button></div>
+    </div>
+    <div class="abm-body">
+      <div style="overflow-x:auto;border:1px solid var(--border);border-radius:9px;overflow:hidden">
+        <table class="abm-tbl"><thead><tr><th>Email</th><th>Nombre</th><th>Cupo</th><th>Usado</th><th>Plan</th><th>Estado</th><th></th></tr></thead>
+        <tbody id="abm-tbody"><tr><td colspan="7" style="text-align:center;padding:20px;color:var(--text3)">Cargando...</td></tr></tbody></table>
+      </div>
+      <div class="abm-form" id="abm-form-usr" style="display:none">
+        <div class="abm-form-title" id="abm-form-usr-title">Nuevo usuario</div>
+        <input type="hidden" id="abm-usr-fila"/>
+        <div class="abm-form-grid">
+          <div class="abm-fg"><label class="abm-lbl">Email *</label><input class="abm-inp" id="abm-usr-email"/></div>
+          <div class="abm-fg"><label class="abm-lbl">Nombre *</label><input class="abm-inp" id="abm-usr-nombre"/></div>
+          <div class="abm-fg"><label class="abm-lbl">Cupo</label><input class="abm-inp" id="abm-usr-cupo" type="number" value="5"/></div>
+          <div class="abm-fg"><label class="abm-lbl">Vencimiento</label><input class="abm-inp" id="abm-usr-venc" type="date"/></div>
+          <div class="abm-fg" style="gap:8px"><div class="abm-chk-row"><input type="checkbox" id="abm-usr-pro"/><label for="abm-usr-pro">PRO</label></div>
+          <div class="abm-chk-row"><input type="checkbox" id="abm-usr-admin"/><label for="abm-usr-admin">Admin</label></div>
+          <div class="abm-chk-row"><input type="checkbox" id="abm-usr-activo" checked/><label for="abm-usr-activo">Activo</label></div></div>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button class="abm-btn abm-btn-cancel" onclick="document.getElementById('abm-form-usr').style.display='none'">Cancelar</button>
+          <button class="abm-btn abm-btn-save" onclick="guardarUsuario()">💾 Guardar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal genérico -->
+<div class="overlay" id="modal-overlay"><div class="modal"><div class="modal-icon" id="modal-icon">📋</div><div class="modal-title" id="modal-title">Confirmar</div><div class="modal-msg" id="modal-msg"></div><div class="modal-btns"><button class="mbtn mbtn-cancel" onclick="closeModal()">Cancelar</button><button class="mbtn mbtn-confirm" id="modal-confirm">Confirmar</button></div></div></div>
+<div class="loading-overlay" id="loading-overlay"><div class="spinner"></div><div class="loading-msg" id="loading-msg">Procesando...</div></div>
+<div class="toast-container" id="toast-container"></div>
+
+<script>
+// ════════════════════════════════════════════════════════
+//  CONFIGURACIÓN
+// ════════════════════════════════════════════════════════
+const API_URL = 'https://TU_URL_DE_APPS_SCRIPT_AQUI/exec';
+
+// ════════════════════════════════════════════════════════
+//  ESTADO GLOBAL
+// ════════════════════════════════════════════════════════
+let SESSION = null, IS_PRO = false, ESTADO_FILTER = 'TODOS';
+
+// ════════════════════════════════════════════════════════
+//  INIT
+// ════════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => { initOTP(); initSession(); });
+
+async function initSession() {
+  const saved = localStorage.getItem('lc_sess');
+  if (saved) {
+    try {
+      const o = JSON.parse(saved);
+      if (o.token && o.user) {
+        SESSION = o; showLoading('Verificando sesión...');
+        const r = await api({action:'getUser',token:o.token});
+        hideLoading();
+        if (r.ok) { SESSION.user = r.user; localStorage.setItem('lc_sess',JSON.stringify(SESSION)); showApp(); return; }
+        SESSION = null; localStorage.removeItem('lc_sess'); toast('Sesión expirada','inf');
+      }
+    } catch(e) { localStorage.removeItem('lc_sess'); }
+  }
+}
+
+// ════════════════════════════════════════════════════════
+//  OTP
+// ════════════════════════════════════════════════════════
+function initOTP() {
+  const inputs = document.querySelectorAll('.otp-inp');
+  inputs.forEach((inp, idx) => {
+    inp.addEventListener('input', e => {
+      const v = e.target.value.replace(/\D/g,'');
+      e.target.value = v.slice(0,1);
+      e.target.classList.toggle('filled', v.length > 0);
+      if (v && idx < 5) inputs[idx+1].focus();
+      if (getOTP().length === 6) verifyCode();
+    });
+    inp.addEventListener('keydown', e => { if (e.key==='Backspace' && !inp.value && idx>0) { inputs[idx-1].focus(); inputs[idx-1].value=''; inputs[idx-1].classList.remove('filled'); } });
+    inp.addEventListener('paste', e => { e.preventDefault(); const p=(e.clipboardData.getData('text')||'').replace(/\D/g,'').slice(0,6); p.split('').forEach((c,i)=>{if(inputs[i]){inputs[i].value=c;inputs[i].classList.add('filled')}}); if(p.length>=6)verifyCode(); });
+  });
+}
+function getOTP(){return Array.from(document.querySelectorAll('.otp-inp')).map(i=>i.value).join('')}
+function clearOTP(){document.querySelectorAll('.otp-inp').forEach(i=>{i.value='';i.classList.remove('filled')})}
+
+// ════════════════════════════════════════════════════════
+//  AUTH
+// ════════════════════════════════════════════════════════
+async function sendCode(){
+  const email=document.getElementById('inp-email').value.trim();
+  if(!email||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){showErr('lerr1','Ingresá un email válido');return;}
+  hideErr('lerr1');setBtnLoading('btn-send',true);
+  const r=await api({action:'sendCode',email});
+  setBtnLoading('btn-send',false);
+  if(!r.ok&&r.needsRegister){abrirRegistro(email);return;}
+  if(!r.ok){showErr('lerr1',r.error);return;}
+  document.getElementById('ls2-sub').textContent='Código enviado a '+email;
+  document.getElementById('ls1').style.display='none';
+  document.getElementById('ls2').style.display='block';
+  setTimeout(()=>document.getElementById('otp0').focus(),100);
+}
+function backToStep1(){clearOTP();hideErr('lerr2');document.getElementById('ls2').style.display='none';document.getElementById('ls1').style.display='block'}
+async function verifyCode(){
+  const code=getOTP();if(code.length<6)return;
+  const email=document.getElementById('inp-email').value.trim();
+  hideErr('lerr2');setBtnLoading('btn-verify',true);
+  const r=await api({action:'verifyCode',email,code});
+  setBtnLoading('btn-verify',false);
+  if(!r.ok){clearOTP();document.getElementById('otp0').focus();showErr('lerr2',r.error);return;}
+  SESSION={token:r.token,user:r.user};
+  localStorage.setItem('lc_sess',JSON.stringify(SESSION));
+  showApp();
+}
+function logout(){
+  SESSION=null;localStorage.removeItem('lc_sess');
+  document.getElementById('screen-login').style.display='flex';
+  document.getElementById('screen-app').classList.remove('visible');
+  document.getElementById('ls1').style.display='block';document.getElementById('ls2').style.display='none';
+  document.getElementById('inp-email').value='';clearOTP();toast('Sesión cerrada','inf');
+}
+let _emailReg='';
+function abrirRegistro(email){_emailReg=email;document.getElementById('reg-nombre').value='';hideErr('reg-err');document.getElementById('register-overlay').classList.add('show');setTimeout(()=>document.getElementById('reg-nombre').focus(),150)}
+async function confirmarRegistro(){
+  const nombre=document.getElementById('reg-nombre').value.trim();
+  if(!nombre||nombre.length<2){showErr('reg-err','Ingresá tu nombre');return;}
+  hideErr('reg-err');const btn=document.getElementById('btn-reg-confirm');btn.disabled=true;btn.textContent='Creando...';
+  const r=await api({action:'registerUser',email:_emailReg,nombre});
+  btn.disabled=false;btn.textContent='Crear cuenta';
+  if(!r.ok){showErr('reg-err',r.error);return;}
+  document.getElementById('register-overlay').classList.remove('show');
+  setBtnLoading('btn-send',true);
+  const r2=await api({action:'sendCode',email:_emailReg});
+  setBtnLoading('btn-send',false);
+  if(!r2.ok){showErr('lerr1',r2.error);return;}
+  document.getElementById('ls2-sub').textContent='¡Cuenta creada! Código enviado a '+_emailReg;
+  document.getElementById('ls1').style.display='none';document.getElementById('ls2').style.display='block';
+  setTimeout(()=>document.getElementById('otp0').focus(),100);toast('✓ Cuenta creada con 5 créditos','ok');
+}
+
+// ════════════════════════════════════════════════════════
+//  APP
+// ════════════════════════════════════════════════════════
+function showApp(){
+  document.getElementById('screen-login').style.display='none';
+  document.getElementById('screen-app').classList.add('visible');
+  renderUser();loadStats();goTab('contratos');
+}
+function renderUser(){
+  if(!SESSION)return;const u=SESSION.user;
+  IS_PRO=u.esPro||u.esAdmin;
+  document.getElementById('uc-name').textContent=u.nombre||u.email;
+  document.getElementById('uc-email').textContent=u.email;
+  const b=document.getElementById('uc-badge');
+  if(u.esAdmin){b.textContent='ADMIN';b.className='uc-badge admin'}
+  else if(IS_PRO){b.textContent='PRO';b.className='uc-badge pro'}
+  else{b.textContent='STD';b.className='uc-badge user'}
+  document.getElementById('btn-abm').style.display=u.esAdmin?'inline-flex':'none';
+  updateCupo(u.cupo,u.cupoUsado);
+}
+function updateCupo(cupo,usado){
+  const pct=cupo>0?Math.min(100,Math.round(usado/cupo*100)):0;
+  document.getElementById('cupo-val').textContent=usado+'/'+cupo;
+  document.getElementById('cupo-disp').textContent=(cupo-usado)+' disponible'+(cupo-usado!==1?'s':'');
+  const f=document.getElementById('cupo-fill');f.style.width=pct+'%';
+  f.className='cupo-fill'+(pct>=100?' danger':pct>=75?' warn':'');
+}
+async function loadStats(){
+  const r=await api({action:'getStats',token:SESSION.token});if(!r.ok)return;
+  updateCupo(r.cupo,r.cupoUsado);
+  const b=document.getElementById('badge-borr');
+  if(r.borrador>0){b.textContent='Borr: '+r.borrador;b.classList.add('show')}else b.classList.remove('show');
+}
+
+// ════════════════════════════════════════════════════════
+//  TABS
+// ════════════════════════════════════════════════════════
+function goTab(tab){
+  ['contratos','nuevo','vista','docs','placeholders'].forEach(t=>{
+    document.getElementById('tab-'+t).style.display=t===tab?'block':'none';
+    const nav=document.getElementById('nav-'+t);if(nav)nav.classList.toggle('active',t===tab);
+  });
+  const titles={contratos:'Mis contratos',nuevo:'Nuevo contrato',vista:'Vista previa',docs:'Documentos',placeholders:'Placeholders'};
+  document.getElementById('topbar-title').textContent=titles[tab]||tab;
+  if(tab==='contratos')loadDatosReales();
+  if(tab==='placeholders')loadPHGlobales();
+  if(tab==='docs')loadDocumentos();
+}
+
+// ════════════════════════════════════════════════════════
+//  PLACEHOLDERS GLOBALES
+// ════════════════════════════════════════════════════════
+function showPHTab(sub){
+  document.getElementById('ph-globales').style.display=sub==='globales'?'block':'none';
+  document.getElementById('ph-contratos').style.display=sub==='contratos'?'block':'none';
+  document.getElementById('st-globales').classList.toggle('active',sub==='globales');
+  document.getElementById('st-contratos').classList.toggle('active',sub==='contratos');
+  if(sub==='globales')loadPHGlobales();else loadPHContratos();
+}
+async function loadPHGlobales(){
+  const r=await api({action:'getPHGlobales',token:SESSION.token});if(!r.ok){toast(r.error,'err');return;}
+  const tbody=document.getElementById('phg-tbody');
+  if(!r.items.length){tbody.innerHTML='<tr><td colspan="5" class="empty-tbl">Sin placeholders globales</td></tr>';return;}
+  tbody.innerHTML=r.items.map(i=>`<tr>
+    <td class="mono" style="font-size:10px;color:var(--cyan)">${esc(i.codigo)}</td>
+    <td>${esc(i.nombre)}</td><td>${esc(i.tipo)}</td><td style="font-family:var(--mono);font-size:10px">${esc(i.valorDefault)}</td>
+    <td><button class="tact" onclick="editPHG(${i.fila})">✏</button> <button class="tact" style="color:var(--red)" onclick="delPHG(${i.fila})">✕</button></td>
+  </tr>`).join('');
+}
+function openPHGForm(){
+  document.getElementById('phg-form-title').textContent='Nuevo placeholder global';
+  ['phg-fila','phg-codigo','phg-nombre','phg-default','phg-desc'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('phg-tipo').value='texto';
+  document.getElementById('phg-form').style.display='block';
+}
+async function editPHG(fila){
+  const r=await api({action:'getPHGlobales',token:SESSION.token});if(!r.ok)return;
+  const item=r.items.find(i=>i.fila===fila);if(!item)return;
+  document.getElementById('phg-form-title').textContent='Editar: '+item.codigo;
+  document.getElementById('phg-fila').value=fila;
+  document.getElementById('phg-codigo').value=item.codigo;
+  document.getElementById('phg-nombre').value=item.nombre;
+  document.getElementById('phg-tipo').value=item.tipo;
+  document.getElementById('phg-default').value=item.valorDefault;
+  document.getElementById('phg-desc').value=item.descripcion;
+  document.getElementById('phg-form').style.display='block';
+}
+async function savePHGlobal(){
+  const p={action:'savePHGlobal',token:SESSION.token,fila:document.getElementById('phg-fila').value,
+    codigo:document.getElementById('phg-codigo').value,nombre:document.getElementById('phg-nombre').value,
+    tipo:document.getElementById('phg-tipo').value,valorDefault:document.getElementById('phg-default').value,
+    descripcion:document.getElementById('phg-desc').value};
+  const r=await api(p);if(!r.ok){toast(r.error,'err');return;}
+  toast('✓ Placeholder '+r.accion,'ok');document.getElementById('phg-form').style.display='none';loadPHGlobales();
+}
+async function delPHG(fila){showModal('✕','¿Eliminar placeholder?','Se eliminará permanentemente.',async()=>{closeModal();const r=await api({action:'deletePHGlobal',token:SESSION.token,fila});if(r.ok){toast('Eliminado','inf');loadPHGlobales()}else toast(r.error,'err')})}
+
+// ════════════════════════════════════════════════════════
+//  PLACEHOLDERS CONTRATOS
+// ════════════════════════════════════════════════════════
+async function loadPHContratos(){
+  const r=await api({action:'getPHContratos',token:SESSION.token});if(!r.ok){toast(r.error,'err');return;}
+  const tbody=document.getElementById('phc-tbody');
+  if(!r.items.length){tbody.innerHTML='<tr><td colspan="7" class="empty-tbl">Sin placeholders</td></tr>';return;}
+  tbody.innerHTML=r.items.map(i=>`<tr>
+    <td class="mono">${i.id}</td>
+    <td class="mono" style="font-size:10px;color:var(--cyan)">${esc(i.codigo)}</td>
+    <td><span class="grupo-chip">${esc(i.grupo)}</span></td>
+    <td>${esc(i.etiqueta)}</td><td>${esc(i.tipo)}</td>
+    <td style="text-align:center">${i.obligatorio?'✓':''}</td>
+    <td><button class="tact" onclick="editPHC(${i.fila},${i.id})">✏</button> <button class="tact" style="color:var(--red)" onclick="delPHC(${i.fila})">✕</button></td>
+  </tr>`).join('');
+}
+function openPHCForm(){
+  document.getElementById('phc-form-title').textContent='Nuevo placeholder de contrato';
+  ['phc-fila','phc-id','phc-codigo','phc-grupo','phc-alias','phc-etiqueta'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('phc-tipo').value='texto';document.getElementById('phc-orden').value='0';
+  document.getElementById('phc-oblig').checked=false;
+  document.getElementById('phc-form').style.display='block';
+}
+async function editPHC(fila,id){
+  const r=await api({action:'getPHContratos',token:SESSION.token});if(!r.ok)return;
+  const item=r.items.find(i=>i.fila===fila);if(!item)return;
+  document.getElementById('phc-form-title').textContent='Editar: '+item.codigo;
+  document.getElementById('phc-fila').value=fila;document.getElementById('phc-id').value=item.id;
+  document.getElementById('phc-codigo').value=item.codigo;document.getElementById('phc-grupo').value=item.grupo;
+  document.getElementById('phc-alias').value=item.alias;document.getElementById('phc-etiqueta').value=item.etiqueta;
+  document.getElementById('phc-tipo').value=item.tipo;document.getElementById('phc-orden').value=item.orden;
+  document.getElementById('phc-oblig').checked=item.obligatorio;
+  document.getElementById('phc-form').style.display='block';
+}
+async function savePHContrato(){
+  const p={action:'savePHContrato',token:SESSION.token,fila:document.getElementById('phc-fila').value,
+    id:document.getElementById('phc-id').value,codigo:document.getElementById('phc-codigo').value,
+    grupo:document.getElementById('phc-grupo').value,alias:document.getElementById('phc-alias').value,
+    etiqueta:document.getElementById('phc-etiqueta').value,tipo:document.getElementById('phc-tipo').value,
+    orden:document.getElementById('phc-orden').value,obligatorio:document.getElementById('phc-oblig').checked};
+  const r=await api(p);if(!r.ok){toast(r.error,'err');return;}
+  toast('✓ Placeholder '+r.accion,'ok');document.getElementById('phc-form').style.display='none';loadPHContratos();
+}
+async function delPHC(fila){showModal('✕','¿Eliminar placeholder?','Se eliminará permanentemente.',async()=>{closeModal();const r=await api({action:'deletePHContrato',token:SESSION.token,fila});if(r.ok){toast('Eliminado','inf');loadPHContratos()}else toast(r.error,'err')})}
+
+// ════════════════════════════════════════════════════════
+//  DOCUMENTOS
+// ════════════════════════════════════════════════════════
+async function loadDocumentos(){
+  const r=await api({action:'getDocumentos',token:SESSION.token});if(!r.ok){toast(r.error,'err');return;}
+  const tbody=document.getElementById('docs-tbody');
+  if(!r.docs.length){tbody.innerHTML='<tr><td colspan="7" class="empty-tbl">Sin documentos</td></tr>';return;}
+  tbody.innerHTML=r.docs.map((d,i)=>{
+    const phCount=d.placeholderIDs?d.placeholderIDs.split(';').filter(s=>s.trim()).length:0;
+    return `<tr><td class="mono">${d.id}</td><td style="font-weight:600;color:var(--text)">${esc(d.nombre)}</td>
+    <td class="mono">${phCount}</td><td class="mono">${d.copiasDefault}</td><td>${esc(d.estado)}</td>
+    <td>${esc(d.fecha)}</td>
+    <td><button class="tact" style="color:var(--red)" onclick="delDoc(${d.id})">✕</button></td></tr>`;
+  }).join('');
+}
+async function crearDocTemplate(){
+  const nombre=prompt('Nombre del documento:');if(!nombre)return;
+  showLoading('Creando documento...');
+  const r=await api({action:'crearDocTemplate',token:SESSION.token,nombre});hideLoading();
+  if(!r.ok){toast(r.error,'err');return;}
+  document.getElementById('doc-gid').value=r.docId;
+  document.getElementById('doc-nombre').value=nombre;
+  toast('✓ Documento creado. Editalo en Google Docs.','ok');
+  window.open(r.docUrl,'_blank');
+}
+async function registrarDocumento(){
+  const gid=document.getElementById('doc-gid').value.trim();
+  const nombre=document.getElementById('doc-nombre').value.trim();
+  if(!nombre){toast('Nombre requerido','err');return;}
+  showLoading('Registrando...');
+  const r=await api({action:'saveDocumento',token:SESSION.token,nombre,googleDocId:gid,
+    placeholderIDs:document.getElementById('doc-phids').value.trim(),
+    copiasDefault:document.getElementById('doc-copias').value||3,
+    descripcion:document.getElementById('doc-desc').value.trim()});
+  hideLoading();
+  if(!r.ok){toast(r.error,'err');return;}
+  toast('✓ Documento registrado','ok');
+  ['doc-gid','doc-nombre','doc-phids','doc-desc'].forEach(id=>document.getElementById(id).value='');
+  loadDocumentos();
+}
+async function delDoc(id){showModal('✕','¿Eliminar documento?','Se eliminará permanentemente.',async()=>{closeModal();const r=await api({action:'deleteDocumento',token:SESSION.token,id});if(r.ok){toast('Eliminado','inf');loadDocumentos()}else toast(r.error,'err')})}
+
+// ════════════════════════════════════════════════════════
+//  DATOS REALES (Mis contratos)
+// ════════════════════════════════════════════════════════
+async function loadDatosReales(){
+  const r=await api({action:'getDatosReales',token:SESSION.token,estado:ESTADO_FILTER});
+  if(!r.ok){toast(r.error,'err');return;}
+  const tbody=document.getElementById('contratos-tbody');
+  if(!r.items.length){tbody.innerHTML='<tr><td colspan="6" class="empty-tbl">Sin contratos</td></tr>';return;}
+  tbody.innerHTML=r.items.map(d=>{
+    const badge={'BORRADOR':'badge-borr','LISTO':'badge-listo','IMPRESO':'badge-imp'}[d.estado]||'badge-borr';
+    return `<tr><td class="mono">${d.id}</td><td style="font-weight:600;color:var(--text)">${esc(d.docNombre)}</td>
+    <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;color:var(--text3)">${esc(d.preview)}</td>
+    <td><span class="badge ${badge}"><span class="badge-dot"></span>${d.estado}</span></td>
+    <td>${esc(d.fecha)}</td>
+    <td><button class="tact" onclick="toast('Próximamente','inf')">Ver</button></td></tr>`;
+  }).join('');
+}
+function setEstadoFilter(e,btn){ESTADO_FILTER=e;document.querySelectorAll('.subtab').forEach(b=>b.classList.remove('active'));btn.classList.add('active');loadDatosReales()}
+
+// ════════════════════════════════════════════════════════
+//  ABM USUARIOS
+// ════════════════════════════════════════════════════════
+async function openABM(){document.getElementById('abm-overlay').classList.add('show');document.getElementById('abm-form-usr').style.display='none';await cargarUsuarios()}
+async function cargarUsuarios(){
+  const r=await api({action:'getUsuarios',token:SESSION.token});if(!r.ok){toast(r.error,'err');return;}
+  const tbody=document.getElementById('abm-tbody');
+  tbody.innerHTML=r.usuarios.map(u=>{
+    const plan=u.esAdmin?'<span style="font-size:9px;background:var(--goldbg);color:var(--gold);padding:2px 7px;border-radius:8px;font-family:var(--mono)">ADMIN</span>':u.esPro?'<span style="font-size:9px;background:var(--bluebg);color:var(--blue);padding:2px 7px;border-radius:8px;font-family:var(--mono)">PRO</span>':'<span style="font-size:9px;color:var(--text3)">STD</span>';
+    const estado=u.activo?'<span style="color:var(--green)">● Activo</span>':'<span style="color:var(--red)">● Inactivo</span>';
+    return `<tr><td style="font-family:var(--mono);font-size:10px">${esc(u.email)}</td><td style="font-weight:600">${esc(u.nombre)}</td>
+    <td class="mono">${u.cupo}</td><td class="mono" style="color:var(--text3)">${u.cupoUsado}</td>
+    <td>${plan}</td><td>${estado}</td>
+    <td><button class="tact" onclick="editarUsr(${u.fila})">✏</button></td></tr>`;
+  }).join('');
+}
+function abrirFormNuevoUsr(){
+  document.getElementById('abm-form-usr-title').textContent='Nuevo usuario';
+  ['abm-usr-fila','abm-usr-email','abm-usr-nombre','abm-usr-venc'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('abm-usr-cupo').value='5';
+  document.getElementById('abm-usr-pro').checked=false;document.getElementById('abm-usr-admin').checked=false;
+  document.getElementById('abm-usr-activo').checked=true;document.getElementById('abm-usr-email').disabled=false;
+  document.getElementById('abm-form-usr').style.display='block';
+}
+async function editarUsr(fila){
+  const r=await api({action:'getUsuarios',token:SESSION.token});if(!r.ok)return;
+  const u=r.usuarios.find(x=>x.fila===fila);if(!u)return;
+  document.getElementById('abm-form-usr-title').textContent='Editar: '+u.email;
+  document.getElementById('abm-usr-fila').value=fila;document.getElementById('abm-usr-email').value=u.email;
+  document.getElementById('abm-usr-nombre').value=u.nombre;document.getElementById('abm-usr-cupo').value=u.cupo;
+  document.getElementById('abm-usr-venc').value=u.vencimiento||'';
+  document.getElementById('abm-usr-pro').checked=u.esPro;document.getElementById('abm-usr-admin').checked=u.esAdmin;
+  document.getElementById('abm-usr-activo').checked=u.activo;document.getElementById('abm-usr-email').disabled=true;
+  document.getElementById('abm-form-usr').style.display='block';
+}
+async function guardarUsuario(){
+  const p={action:'saveUsuario',token:SESSION.token,fila:document.getElementById('abm-usr-fila').value,
+    email:document.getElementById('abm-usr-email').value,nombre:document.getElementById('abm-usr-nombre').value,
+    cupo:document.getElementById('abm-usr-cupo').value,vencimiento:document.getElementById('abm-usr-venc').value,
+    esPro:document.getElementById('abm-usr-pro').checked,esAdmin:document.getElementById('abm-usr-admin').checked,
+    activo:document.getElementById('abm-usr-activo').checked};
+  showLoading('Guardando...');const r=await api(p);hideLoading();
+  if(!r.ok){toast(r.error,'err');return;}
+  toast('✓ Usuario '+r.accion,'ok');document.getElementById('abm-form-usr').style.display='none';cargarUsuarios();
+}
+
+// ════════════════════════════════════════════════════════
+//  API
+// ════════════════════════════════════════════════════════
+async function api(params){
+  try{
+    const usePost=['saveDocumento','saveDatosReales','generarContrato','sendPrivEmail'].includes(params.action);
+    if(usePost){
+      const res=await fetch(API_URL,{method:'POST',redirect:'follow',body:JSON.stringify(params)});
+      const txt=await res.text();try{return JSON.parse(txt)}catch{const m=txt.match(/\{[\s\S]*\}/);if(m)return JSON.parse(m[0]);throw new Error('Respuesta inválida')}
+    }
+    const url=API_URL+'?'+new URLSearchParams(params).toString();
+    const res=await fetch(url,{redirect:'follow'});
+    const txt=await res.text();try{return JSON.parse(txt)}catch{const m=txt.match(/\{[\s\S]*\}/);if(m)return JSON.parse(m[0]);throw new Error('Respuesta inválida')}
+  }catch(err){return{ok:false,error:err.message}}
+}
+
+// ════════════════════════════════════════════════════════
+//  MODAL / LOADING / TOAST
+// ════════════════════════════════════════════════════════
+let _modalCb=null;
+function showModal(icon,title,msg,onConfirm){document.getElementById('modal-icon').textContent=icon;document.getElementById('modal-title').textContent=title;document.getElementById('modal-msg').textContent=msg;_modalCb=onConfirm;document.getElementById('modal-confirm').onclick=()=>{if(_modalCb)_modalCb()};document.getElementById('modal-overlay').classList.add('show')}
+function closeModal(){document.getElementById('modal-overlay').classList.remove('show');_modalCb=null}
+function showLoading(msg){document.getElementById('loading-msg').textContent=msg||'Procesando...';document.getElementById('loading-overlay').classList.add('show')}
+function hideLoading(){document.getElementById('loading-overlay').classList.remove('show')}
+function toast(msg,type='inf'){const c=document.getElementById('toast-container');const t=document.createElement('div');t.className='toast toast-'+type;t.textContent=msg;c.appendChild(t);setTimeout(()=>{t.style.opacity='0';t.style.transition='opacity .3s';setTimeout(()=>t.remove(),350)},3500)}
+function esc(s){if(s==null)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function showErr(id,msg){const e=document.getElementById(id);e.textContent=msg;e.classList.add('show')}
+function hideErr(id){document.getElementById(id).classList.remove('show')}
+function setBtnLoading(id,on){const b=document.getElementById(id);if(!b)return;if(on){b._orig=b.innerHTML;b.innerHTML='<span class="spin-inline"></span>&nbsp;Enviando...';b.disabled=true}else{b.innerHTML=b._orig||b.innerHTML;b.disabled=false}}
+</script>
+</body>
+</html>
