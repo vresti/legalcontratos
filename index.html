@@ -325,9 +325,60 @@ select.finp option{background:var(--bg2)}
 
       <!-- ═══ TAB: NUEVO CONTRATO ═══ -->
       <div id="tab-nuevo" style="display:none">
-        <div class="empty-state"><div class="es-icon">📝</div><div class="es-title">Nuevo contrato</div>
-        <div class="es-sub">Primero configurá tus Documentos y Placeholders en las secciones de Configuración. Luego podrás cargar datos y generar contratos.</div>
-        <button class="fab fab-blue" onclick="goTab('docs')">📄 Ir a Documentos</button></div>
+        <!-- Paso 1: Elegir documento -->
+        <div class="form-section">
+          <div class="fsec-lbl">Paso 1 — Elegir documento</div>
+          <div class="form-grid">
+            <div class="fg">
+              <label class="flbl">Documento template <span class="req">*</span></label>
+              <select class="finp" id="nc-doc" onchange="onDocSelected()">
+                <option value="">-- Seleccioná un documento --</option>
+              </select>
+            </div>
+            <div class="fg">
+              <label class="flbl">Copias (ejemplares)</label>
+              <input class="finp" id="nc-copias" type="number" min="1" value="3" style="max-width:100px"/>
+            </div>
+          </div>
+        </div>
+
+        <!-- Paso 2: Formulario dinámico -->
+        <div id="nc-form-area" style="display:none">
+          <div class="form-section">
+            <div class="fsec-lbl">Paso 2 — Completar datos</div>
+            <div id="nc-fields"></div>
+          </div>
+
+          <!-- Paso 3: Tabla de carga masiva -->
+          <div class="form-section">
+            <div class="fsec-lbl">Renglones de datos <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:10px;color:var(--text3)">— cada renglón genera un contrato</span></div>
+            <div style="overflow-x:auto">
+              <div class="tbl-wrap">
+                <table class="tbl" id="nc-tabla">
+                  <thead><tr id="nc-thead"></tr></thead>
+                  <tbody id="nc-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:10px">
+              <button class="fab fab-ghost" onclick="addRenglon()">+ Agregar renglón</button>
+              <button class="fab fab-ghost" onclick="removeLastRenglon()">− Quitar último</button>
+            </div>
+          </div>
+
+          <!-- Acciones -->
+          <div style="display:flex;gap:10px;margin-top:16px;padding-top:16px;border-top:1px solid var(--border);max-width:900px">
+            <button class="fab fab-blue" onclick="guardarContratos()">💾 Guardar borradores</button>
+            <button class="fab fab-green" onclick="guardarYGenerar()">🖨 Guardar y generar</button>
+          </div>
+        </div>
+
+        <!-- Sin documentos -->
+        <div id="nc-empty" style="display:none">
+          <div class="empty-state" style="padding:30px"><div class="es-icon">📄</div><div class="es-title">Sin documentos</div>
+          <div class="es-sub">Primero creá un documento template y cargá los placeholders.</div>
+          <button class="fab fab-blue" onclick="goTab('docs')">📄 Ir a Documentos</button></div>
+        </div>
       </div>
 
       <!-- ═══ TAB: VISTA PREVIA ═══ -->
@@ -620,6 +671,7 @@ function goTab(tab){
   if(tab==='contratos')loadDatosReales();
   if(tab==='placeholders')loadPHGlobales();
   if(tab==='docs')loadDocumentos();
+  if(tab==='nuevo')loadDocSelector();
 }
 
 // ════════════════════════════════════════════════════════
@@ -767,14 +819,239 @@ async function loadDatosReales(){
   if(!r.items.length){tbody.innerHTML='<tr><td colspan="6" class="empty-tbl">Sin contratos</td></tr>';return;}
   tbody.innerHTML=r.items.map(d=>{
     const badge={'BORRADOR':'badge-borr','LISTO':'badge-listo','IMPRESO':'badge-imp'}[d.estado]||'badge-borr';
+    const genBtn = d.estado==='BORRADOR'
+      ? '<button class="tact" style="border-color:rgba(34,197,94,.3);color:var(--green)" onclick="generarUno('+d.id+')">🖨 Generar</button>'
+      : '<span style="font-size:9px;color:var(--text3)">✓ Generado</span>';
     return `<tr><td class="mono">${d.id}</td><td style="font-weight:600;color:var(--text)">${esc(d.docNombre)}</td>
     <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;color:var(--text3)">${esc(d.preview)}</td>
     <td><span class="badge ${badge}"><span class="badge-dot"></span>${d.estado}</span></td>
     <td>${esc(d.fecha)}</td>
-    <td><button class="tact" onclick="toast('Próximamente','inf')">Ver</button></td></tr>`;
+    <td style="white-space:nowrap;display:flex;gap:5px">${genBtn}
+    ${d.estado==='BORRADOR'?'<button class="tact" style="color:var(--red);border-color:transparent" onclick="eliminarContrato('+d.id+')">✕</button>':''}
+    ${d.hash?'<button class="tact" title="'+esc(d.hash.slice(0,16))+'..." onclick="toast(\'Hash: '+esc(d.hash.slice(0,24))+'...\',\'inf\')">🔐</button>':''}
+    </td></tr>`;
   }).join('');
 }
-function setEstadoFilter(e,btn){ESTADO_FILTER=e;document.querySelectorAll('.subtab').forEach(b=>b.classList.remove('active'));btn.classList.add('active');loadDatosReales()}
+function setEstadoFilter(e,btn){ESTADO_FILTER=e;document.querySelectorAll('#tab-contratos .subtab').forEach(b=>b.classList.remove('active'));btn.classList.add('active');loadDatosReales()}
+
+// ════════════════════════════════════════════════════════
+//  NUEVO CONTRATO — Formulario dinámico
+// ════════════════════════════════════════════════════════
+let NC_DOC = null;      // documento seleccionado
+let NC_PLACEHOLDERS = []; // placeholders del doc
+let NC_RENGLONES = 1;
+
+async function loadDocSelector(){
+  const r = await api({action:'getDocumentos',token:SESSION.token});
+  const sel = document.getElementById('nc-doc');
+  sel.innerHTML = '<option value="">-- Seleccioná un documento --</option>';
+  if (!r.ok || !r.docs.length) {
+    document.getElementById('nc-empty').style.display = 'block';
+    document.getElementById('nc-form-area').style.display = 'none';
+    return;
+  }
+  document.getElementById('nc-empty').style.display = 'none';
+  r.docs.filter(d => d.estado === 'ACTIVO').forEach(d => {
+    const opt = document.createElement('option');
+    opt.value = d.id; opt.textContent = d.nombre;
+    opt.dataset.copias = d.copiasDefault;
+    sel.appendChild(opt);
+  });
+}
+
+async function onDocSelected(){
+  const sel = document.getElementById('nc-doc');
+  const docId = sel.value;
+  if (!docId) { document.getElementById('nc-form-area').style.display = 'none'; return; }
+
+  // Copias default
+  const opt = sel.options[sel.selectedIndex];
+  document.getElementById('nc-copias').value = opt.dataset.copias || 3;
+
+  showLoading('Cargando placeholders...');
+  const r = await api({action:'getDocumento',token:SESSION.token,id:docId});
+  hideLoading();
+  if (!r.ok) { toast(r.error,'err'); return; }
+
+  NC_DOC = r.doc;
+  NC_PLACEHOLDERS = r.placeholders || [];
+
+  if (!NC_PLACEHOLDERS.length) {
+    toast('Este documento no tiene placeholders asignados. Editá el documento y agregá los IDs.','err');
+    document.getElementById('nc-form-area').style.display = 'none';
+    return;
+  }
+
+  buildDynamicForm();
+  document.getElementById('nc-form-area').style.display = 'block';
+}
+
+function buildDynamicForm(){
+  // Agrupar por grupo
+  const grupos = {};
+  NC_PLACEHOLDERS.forEach(ph => {
+    const g = ph.grupo || 'GENERAL';
+    if (!grupos[g]) grupos[g] = [];
+    grupos[g].push(ph);
+  });
+
+  // Construir campos agrupados (referencia visual)
+  let html = '';
+  for (const [grupo, phs] of Object.entries(grupos)) {
+    html += '<div style="margin-bottom:14px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">';
+    html += '<span class="grupo-chip">' + esc(grupo) + '</span>';
+    html += '<span style="font-size:10px;color:var(--text3)">' + phs.length + ' campo' + (phs.length>1?'s':'') + '</span></div>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:6px">';
+    phs.forEach(ph => {
+      html += '<span style="font-size:10px;padding:3px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:5px;color:var(--cyan);font-family:var(--mono)">' + esc(ph.codigo) + '</span>';
+    });
+    html += '</div></div>';
+  }
+  document.getElementById('nc-fields').innerHTML = html;
+
+  // Construir tabla de carga
+  let thead = '<th style="width:40px">#</th>';
+  NC_PLACEHOLDERS.forEach(ph => {
+    const label = ph.etiqueta || ph.codigo;
+    const req = ph.obligatorio ? ' <span style="color:var(--red)">*</span>' : '';
+    thead += '<th style="min-width:120px;font-size:8px">' + esc(label) + req + '</th>';
+  });
+  document.getElementById('nc-thead').innerHTML = thead;
+
+  // Un renglón inicial
+  NC_RENGLONES = 0;
+  document.getElementById('nc-tbody').innerHTML = '';
+  addRenglon();
+}
+
+function addRenglon(){
+  NC_RENGLONES++;
+  const tr = document.createElement('tr');
+  tr.id = 'nc-row-' + NC_RENGLONES;
+  let cells = '<td class="mono" style="color:var(--text3);text-align:center">' + NC_RENGLONES + '</td>';
+  NC_PLACEHOLDERS.forEach(ph => {
+    const tipo = ph.tipo || 'texto';
+    let inputType = 'text';
+    if (tipo === 'numero' || tipo === 'moneda') inputType = 'number';
+    else if (tipo === 'fecha') inputType = 'date';
+    cells += '<td><input class="finp" type="' + inputType + '" data-codigo="' + esc(ph.codigo) + '"' +
+             ' placeholder="' + esc(ph.etiqueta || ph.codigo) + '"' +
+             ' style="min-width:100px;font-size:11px;padding:6px 8px"/></td>';
+  });
+  tr.innerHTML = cells;
+  document.getElementById('nc-tbody').appendChild(tr);
+}
+
+function removeLastRenglon(){
+  if (NC_RENGLONES <= 1) { toast('Mínimo 1 renglón','inf'); return; }
+  const tr = document.getElementById('nc-row-' + NC_RENGLONES);
+  if (tr) tr.remove();
+  NC_RENGLONES--;
+}
+
+function recogerRenglones(){
+  const renglones = [];
+  for (let i = 1; i <= NC_RENGLONES; i++) {
+    const tr = document.getElementById('nc-row-' + i);
+    if (!tr) continue;
+    const inputs = tr.querySelectorAll('input[data-codigo]');
+    const datos = {};
+    let vacio = true;
+    inputs.forEach(inp => {
+      const val = inp.value.trim();
+      if (val) vacio = false;
+      datos[inp.dataset.codigo] = val;
+    });
+    if (vacio) continue;
+
+    // Validar obligatorios
+    let falta = false;
+    NC_PLACEHOLDERS.forEach(ph => {
+      if (ph.obligatorio && !datos[ph.codigo]) {
+        falta = true;
+        toast('Falta: ' + (ph.etiqueta||ph.codigo) + ' en renglón ' + i, 'err');
+      }
+    });
+    if (falta) return null;
+    renglones.push(datos);
+  }
+  return renglones;
+}
+
+async function guardarContratos(){
+  const renglones = recogerRenglones();
+  if (!renglones) return; // validación falló
+  if (!renglones.length) { toast('Completá al menos un renglón','err'); return; }
+
+  showLoading('Guardando ' + renglones.length + ' contrato' + (renglones.length>1?'s':'') + '...');
+  const r = await api({
+    action: 'saveDatosReales', token: SESSION.token,
+    documentoId: NC_DOC.id,
+    renglones: JSON.stringify(renglones)
+  });
+  hideLoading();
+  if (!r.ok) { toast(r.error,'err'); return; }
+  toast('✓ ' + r.cantidad + ' contrato' + (r.cantidad>1?'s':'') + ' guardado' + (r.cantidad>1?'s':'') + ' como borrador','ok');
+  loadStats();
+  setTimeout(() => goTab('contratos'), 600);
+}
+
+async function guardarYGenerar(){
+  const renglones = recogerRenglones();
+  if (!renglones) return;
+  if (!renglones.length) { toast('Completá al menos un renglón','err'); return; }
+
+  showModal('🖨','¿Guardar y generar?',
+    renglones.length + ' contrato' + (renglones.length>1?'s':'') + ' se guardarán y generarán.\nRecibirás el PDF por email.',
+    async () => {
+      closeModal();
+      showLoading('Guardando...');
+      const r = await api({
+        action: 'saveDatosReales', token: SESSION.token,
+        documentoId: NC_DOC.id,
+        renglones: JSON.stringify(renglones)
+      });
+      if (!r.ok) { hideLoading(); toast(r.error,'err'); return; }
+
+      // Generar cada uno
+      let ok = 0, fail = 0;
+      for (const id of r.ids) {
+        document.getElementById('loading-msg').textContent = 'Generando contrato ' + (ok+fail+1) + '/' + r.ids.length + '...';
+        const g = await api({ action: 'generarContrato', token: SESSION.token, datosRealesId: id });
+        if (g.ok) ok++; else fail++;
+      }
+      hideLoading();
+      if (ok > 0) toast('✓ ' + ok + ' contrato' + (ok>1?'s':'') + ' generado' + (ok>1?'s':'') + ' y enviado' + (ok>1?'s':'') + ' por email','ok');
+      if (fail > 0) toast(fail + ' contrato' + (fail>1?'s':'') + ' con error','err');
+      loadStats();
+      setTimeout(() => goTab('contratos'), 800);
+    }
+  );
+}
+
+// ════════════════════════════════════════════════════════
+//  ACCIONES DESDE MIS CONTRATOS
+// ════════════════════════════════════════════════════════
+async function generarUno(id){
+  showModal('🖨','¿Generar contrato?','Se generará el PDF con merge, hash y QR.\nRecibirás el documento por email.',async()=>{
+    closeModal();showLoading('Generando contrato...');
+    const r=await api({action:'generarContrato',token:SESSION.token,datosRealesId:id});
+    hideLoading();
+    if(!r.ok){toast(r.error,'err');return;}
+    toast('✓ '+r.mensaje,'ok');
+    loadStats();loadDatosReales();
+  });
+}
+
+async function eliminarContrato(id){
+  showModal('✕','¿Eliminar contrato borrador?','Se eliminará permanentemente.',async()=>{
+    closeModal();showLoading('Eliminando...');
+    const r=await api({action:'deleteDatoReal',token:SESSION.token,id});
+    hideLoading();
+    if(!r.ok){toast(r.error,'err');return;}
+    toast('Eliminado','inf');loadDatosReales();
+  });
+}
 
 // ════════════════════════════════════════════════════════
 //  ABM USUARIOS
