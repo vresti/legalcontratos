@@ -328,31 +328,29 @@ select.finp option{background:var(--bg2)}
       <div id="tab-nuevo" style="display:none">
         <!-- Paso 1: Elegir documento -->
         <div class="form-section">
-          <div class="fsec-lbl">Paso 1 — Elegir documento</div>
-          <div class="form-grid">
-            <div class="fg">
+          <div class="fsec-lbl">Documento y datos</div>
+          <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
+            <div class="fg" style="flex:1;min-width:200px">
               <label class="flbl">Documento template <span class="req">*</span></label>
               <select class="finp" id="nc-doc" onchange="onDocSelected()">
                 <option value="">-- Seleccioná un documento --</option>
               </select>
             </div>
-            <div class="fg">
-              <label class="flbl">Copias (ejemplares)</label>
-              <input class="finp" id="nc-copias" type="number" min="1" value="3" style="max-width:100px"/>
+            <div class="fg" style="width:100px">
+              <label class="flbl">Copias</label>
+              <input class="finp" id="nc-copias" type="number" min="1" value="3"/>
             </div>
+            <button class="tbtn" id="nc-btn-info" onclick="toggleNCInfo()" style="display:none;margin-bottom:1px">ℹ️ Ver campos</button>
+            <button class="tbtn" id="nc-btn-labels" onclick="openEditLabels()" style="display:none;margin-bottom:1px">✏️ Etiquetas</button>
           </div>
+          <!-- Info colapsable de campos -->
+          <div id="nc-fields" style="display:none;margin-top:12px;padding:12px;background:var(--bg2);border:1px solid var(--border);border-radius:8px"></div>
         </div>
 
-        <!-- Paso 2: Formulario dinámico -->
+        <!-- Tabla de carga (protagonista) -->
         <div id="nc-form-area" style="display:none">
           <div class="form-section">
-            <div class="fsec-lbl">Paso 2 — Completar datos</div>
-            <div id="nc-fields"></div>
-          </div>
-
-          <!-- Paso 3: Tabla de carga masiva -->
-          <div class="form-section">
-            <div class="fsec-lbl">Renglones de datos <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:10px;color:var(--text3)">— cada renglón genera un contrato</span></div>
+            <div class="fsec-lbl">Carga de datos <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:10px;color:var(--text3)">— cada renglón genera un contrato</span></div>
             <div style="overflow-x:auto">
               <div class="tbl-wrap">
                 <table class="tbl" id="nc-tabla">
@@ -379,6 +377,20 @@ select.finp option{background:var(--bg2)}
           <div class="empty-state" style="padding:30px"><div class="es-icon">📄</div><div class="es-title">Sin documentos</div>
           <div class="es-sub">Primero creá un documento template y cargá los placeholders.</div>
           <button class="fab fab-blue" onclick="goTab('docs')">📄 Ir a Documentos</button></div>
+        </div>
+      </div>
+
+      <!-- Modal editar etiquetas -->
+      <div class="overlay" id="labels-overlay">
+        <div class="modal" style="max-width:600px;max-height:85vh;overflow-y:auto">
+          <div class="modal-icon">✏️</div>
+          <div class="modal-title">Editar etiquetas de columnas</div>
+          <div style="font-size:11px;color:var(--text3);text-align:center;margin-bottom:16px">Cambiá los títulos de las columnas para que sea más claro qué completar en cada campo.</div>
+          <div id="labels-body" style="display:flex;flex-direction:column;gap:8px"></div>
+          <div class="modal-btns" style="margin-top:16px">
+            <button class="mbtn mbtn-cancel" onclick="document.getElementById('labels-overlay').classList.remove('show')">Cancelar</button>
+            <button class="mbtn mbtn-confirm" onclick="applyLabels()">✓ Aplicar</button>
+          </div>
         </div>
       </div>
 
@@ -1093,9 +1105,14 @@ async function loadDocSelector(){
 async function onDocSelected(){
   const sel = document.getElementById('nc-doc');
   const docId = sel.value;
-  if (!docId) { document.getElementById('nc-form-area').style.display = 'none'; return; }
+  if (!docId) {
+    document.getElementById('nc-form-area').style.display = 'none';
+    document.getElementById('nc-btn-info').style.display = 'none';
+    document.getElementById('nc-btn-labels').style.display = 'none';
+    document.getElementById('nc-fields').style.display = 'none';
+    return;
+  }
 
-  // Copias default
   const opt = sel.options[sel.selectedIndex];
   document.getElementById('nc-copias').value = opt.dataset.copias || 3;
 
@@ -1113,12 +1130,35 @@ async function onDocSelected(){
     return;
   }
 
+  // Cargar etiquetas custom de localStorage si existen
+  var savedLabels = localStorage.getItem('lc_labels_' + NC_DOC.id);
+  if (savedLabels) {
+    try {
+      var labels = JSON.parse(savedLabels);
+      NC_PLACEHOLDERS.forEach(function(ph) {
+        if (labels[ph.codigo]) ph.etiquetaCustom = labels[ph.codigo];
+      });
+    } catch(e) {}
+  }
+
+  // Mostrar botones
+  document.getElementById('nc-btn-info').style.display = 'inline-flex';
+  document.getElementById('nc-btn-labels').style.display = 'inline-flex';
+  document.getElementById('nc-fields').style.display = 'none'; // empieza oculto
+
   buildDynamicForm();
   document.getElementById('nc-form-area').style.display = 'block';
 }
 
+function toggleNCInfo(){
+  var el = document.getElementById('nc-fields');
+  var visible = el.style.display !== 'none';
+  el.style.display = visible ? 'none' : 'block';
+  document.getElementById('nc-btn-info').textContent = visible ? 'ℹ️ Ver campos' : 'ℹ️ Ocultar campos';
+}
+
 function buildDynamicForm(){
-  // Agrupar por grupo
+  // Agrupar por grupo para la info colapsable
   const grupos = {};
   NC_PLACEHOLDERS.forEach(ph => {
     const g = ph.grupo || 'GENERAL';
@@ -1126,26 +1166,27 @@ function buildDynamicForm(){
     grupos[g].push(ph);
   });
 
-  // Construir campos agrupados (referencia visual)
+  // Info colapsable
   let html = '';
   for (const [grupo, phs] of Object.entries(grupos)) {
-    html += '<div style="margin-bottom:14px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">';
+    html += '<div style="margin-bottom:8px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">';
     html += '<span class="grupo-chip">' + esc(grupo) + '</span>';
     html += '<span style="font-size:10px;color:var(--text3)">' + phs.length + ' campo' + (phs.length>1?'s':'') + '</span></div>';
-    html += '<div style="display:flex;flex-wrap:wrap;gap:6px">';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:4px">';
     phs.forEach(ph => {
-      html += '<span style="font-size:10px;padding:3px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:5px;color:var(--cyan);font-family:var(--mono)">' + esc(ph.codigo) + '</span>';
+      var label = ph.etiquetaCustom || ph.etiqueta || ph.codigo;
+      html += '<span style="font-size:9px;padding:2px 6px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--cyan);font-family:var(--mono)" title="' + esc(ph.codigo) + '">' + esc(label) + '</span>';
     });
     html += '</div></div>';
   }
   document.getElementById('nc-fields').innerHTML = html;
 
-  // Construir tabla de carga
+  // Construir tabla — usar etiqueta custom si existe
   let thead = '<th style="width:40px">#</th>';
   NC_PLACEHOLDERS.forEach(ph => {
-    const label = ph.etiqueta || ph.codigo;
+    const label = ph.etiquetaCustom || ph.etiqueta || ph.codigo;
     const req = ph.obligatorio ? ' <span style="color:var(--red)">*</span>' : '';
-    thead += '<th style="min-width:120px;font-size:8px">' + esc(label) + req + '</th>';
+    thead += '<th style="min-width:120px;font-size:8px" title="' + esc(ph.codigo) + '">' + esc(label) + req + '</th>';
   });
   document.getElementById('nc-thead').innerHTML = thead;
 
@@ -1155,6 +1196,38 @@ function buildDynamicForm(){
   addRenglon();
 }
 
+// ── Editar etiquetas de columnas ──
+function openEditLabels(){
+  if (!NC_PLACEHOLDERS.length) { toast('No hay placeholders cargados','err'); return; }
+  var body = document.getElementById('labels-body');
+  body.innerHTML = NC_PLACEHOLDERS.map(function(ph, i) {
+    var current = ph.etiquetaCustom || ph.etiqueta || '';
+    return '<div style="display:flex;align-items:center;gap:8px">' +
+      '<span style="font-size:9px;color:var(--cyan);font-family:var(--mono);min-width:180px;flex-shrink:0" title="' + esc(ph.codigo) + '">' + esc(ph.codigo) + '</span>' +
+      '<input class="finp lbl-inp" data-idx="' + i + '" value="' + esc(current) + '" placeholder="' + esc(ph.etiqueta || ph.codigo) + '" style="font-size:11px;padding:6px 8px"/>' +
+      '</div>';
+  }).join('');
+  document.getElementById('labels-overlay').classList.add('show');
+}
+
+function applyLabels(){
+  var inputs = document.querySelectorAll('.lbl-inp');
+  var labels = {};
+  inputs.forEach(function(inp) {
+    var idx = parseInt(inp.dataset.idx);
+    var val = inp.value.trim();
+    if (val && NC_PLACEHOLDERS[idx]) {
+      NC_PLACEHOLDERS[idx].etiquetaCustom = val;
+      labels[NC_PLACEHOLDERS[idx].codigo] = val;
+    }
+  });
+  // Guardar en localStorage por documento
+  if (NC_DOC) localStorage.setItem('lc_labels_' + NC_DOC.id, JSON.stringify(labels));
+  document.getElementById('labels-overlay').classList.remove('show');
+  buildDynamicForm(); // rebuild tabla con nuevas etiquetas
+  toast('✓ Etiquetas actualizadas','ok');
+}
+
 function addRenglon(){
   NC_RENGLONES++;
   const tr = document.createElement('tr');
@@ -1162,11 +1235,12 @@ function addRenglon(){
   let cells = '<td class="mono" style="color:var(--text3);text-align:center">' + NC_RENGLONES + '</td>';
   NC_PLACEHOLDERS.forEach(ph => {
     const tipo = ph.tipo || 'texto';
+    const label = ph.etiquetaCustom || ph.etiqueta || ph.codigo;
     let inputType = 'text';
     if (tipo === 'numero' || tipo === 'moneda') inputType = 'number';
     else if (tipo === 'fecha') inputType = 'date';
     cells += '<td><input class="finp" type="' + inputType + '" data-codigo="' + esc(ph.codigo) + '"' +
-             ' placeholder="' + esc(ph.etiqueta || ph.codigo) + '"' +
+             ' placeholder="' + esc(label) + '"' +
              ' style="min-width:100px;font-size:11px;padding:6px 8px"/></td>';
   });
   tr.innerHTML = cells;
