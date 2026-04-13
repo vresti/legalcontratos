@@ -1069,6 +1069,7 @@ async function loadDatosReales(){
     <td>${esc(d.fecha)}</td>
     <td style="white-space:nowrap;display:flex;gap:5px">
     <button class="tact" onclick="verContrato(${d.id})">👁 Ver</button>
+    ${d.estado==='BORRADOR'?'<button class="tact" style="border-color:rgba(59,130,246,.3);color:var(--blue)" onclick="editarContrato('+d.id+')">✏️ Editar</button>':''}
     ${genBtn}
     ${d.estado==='BORRADOR'?'<button class="tact" style="color:var(--red);border-color:transparent" onclick="eliminarContrato('+d.id+')">✕</button>':''}
     ${d.hash?'<button class="tact" title="'+esc(d.hash.slice(0,16))+'..." onclick="toast(\'Hash: '+esc(d.hash.slice(0,24))+'...\',\'inf\')">🔐</button>':''}
@@ -1083,6 +1084,7 @@ function setEstadoFilter(e,btn){ESTADO_FILTER=e;document.querySelectorAll('#tab-
 let NC_DOC = null;      // documento seleccionado
 let NC_PLACEHOLDERS = []; // placeholders del doc
 let NC_RENGLONES = 1;
+let NC_EDITING_ID = null; // null = nuevo, número = editando borrador
 
 async function loadDocSelector(){
   const r = await api({action:'getDocumentos',token:SESSION.token});
@@ -1103,6 +1105,7 @@ async function loadDocSelector(){
 }
 
 async function onDocSelected(){
+  NC_EDITING_ID = null; // reset edición
   const sel = document.getElementById('nc-doc');
   const docId = sel.value;
   if (!docId) {
@@ -1285,9 +1288,27 @@ function recogerRenglones(){
 
 async function guardarContratos(){
   const renglones = recogerRenglones();
-  if (!renglones) return; // validación falló
+  if (!renglones) return;
   if (!renglones.length) { toast('Completá al menos un renglón','err'); return; }
 
+  // Modo edición: actualizar en vez de crear
+  if (NC_EDITING_ID) {
+    showLoading('Actualizando borrador...');
+    const r = await api({
+      action: 'updateDatoReal', token: SESSION.token,
+      id: NC_EDITING_ID,
+      datosJSON: JSON.stringify(renglones[0])
+    });
+    hideLoading();
+    if (!r.ok) { toast(r.error,'err'); return; }
+    toast('✓ Borrador #' + NC_EDITING_ID + ' actualizado','ok');
+    NC_EDITING_ID = null;
+    loadStats();
+    setTimeout(() => goTab('contratos'), 600);
+    return;
+  }
+
+  // Modo nuevo
   showLoading('Guardando ' + renglones.length + ' contrato' + (renglones.length>1?'s':'') + '...');
   const r = await api({
     action: 'saveDatosReales', token: SESSION.token,
@@ -1297,8 +1318,69 @@ async function guardarContratos(){
   hideLoading();
   if (!r.ok) { toast(r.error,'err'); return; }
   toast('✓ ' + r.cantidad + ' contrato' + (r.cantidad>1?'s':'') + ' guardado' + (r.cantidad>1?'s':'') + ' como borrador','ok');
+  NC_EDITING_ID = null;
   loadStats();
   setTimeout(() => goTab('contratos'), 600);
+}
+
+async function editarContrato(id){
+  showLoading('Cargando borrador...');
+  // 1. Cargar el dato real
+  const r = await api({action:'getDatoReal',token:SESSION.token,id:id});
+  if(!r.ok){ hideLoading(); toast(r.error,'err'); return; }
+  var item = r.item;
+  if(item.estado !== 'BORRADOR'){ hideLoading(); toast('Solo se pueden editar borradores','err'); return; }
+
+  var datos = {};
+  try { datos = JSON.parse(item.datosJSON || '{}'); } catch(e) {}
+
+  // 2. Cargar documento y placeholders
+  const r2 = await api({action:'getDocumento',token:SESSION.token,id:item.documentoId});
+  hideLoading();
+  if(!r2.ok){ toast(r2.error,'err'); return; }
+
+  // 3. Setear estado de edición
+  NC_EDITING_ID = id;
+  NC_DOC = r2.doc;
+  NC_PLACEHOLDERS = r2.placeholders || [];
+
+  // Cargar etiquetas custom
+  var savedLabels = localStorage.getItem('lc_labels_' + NC_DOC.id);
+  if (savedLabels) {
+    try {
+      var labels = JSON.parse(savedLabels);
+      NC_PLACEHOLDERS.forEach(function(ph) {
+        if (labels[ph.codigo]) ph.etiquetaCustom = labels[ph.codigo];
+      });
+    } catch(e) {}
+  }
+
+  // 4. Ir al tab nuevo
+  goTab('nuevo');
+
+  // 5. Seleccionar el documento en el dropdown
+  var sel = document.getElementById('nc-doc');
+  sel.value = String(item.documentoId);
+  document.getElementById('nc-copias').value = NC_DOC.copiasDefault || 3;
+  document.getElementById('nc-btn-info').style.display = 'inline-flex';
+  document.getElementById('nc-btn-labels').style.display = 'inline-flex';
+  document.getElementById('nc-fields').style.display = 'none';
+
+  // 6. Construir formulario
+  buildDynamicForm();
+  document.getElementById('nc-form-area').style.display = 'block';
+
+  // 7. Rellenar los datos del borrador en el renglón 1
+  var row = document.getElementById('nc-row-1');
+  if (row) {
+    var inputs = row.querySelectorAll('input[data-codigo]');
+    inputs.forEach(function(inp) {
+      var codigo = inp.dataset.codigo;
+      if (datos[codigo] !== undefined) inp.value = datos[codigo];
+    });
+  }
+
+  toast('✏️ Editando borrador #' + id + ' — modificá y guardá','inf');
 }
 
 async function guardarYGenerar(){
@@ -1306,10 +1388,35 @@ async function guardarYGenerar(){
   if (!renglones) return;
   if (!renglones.length) { toast('Completá al menos un renglón','err'); return; }
 
-  showModal('🖨','¿Guardar y generar?',
-    renglones.length + ' contrato' + (renglones.length>1?'s':'') + ' se guardarán y generarán.\nRecibirás el PDF por email.',
+  var msg = NC_EDITING_ID
+    ? 'Se actualizará el borrador #' + NC_EDITING_ID + ' y se generará el contrato.\nRecibirás el PDF por email.'
+    : renglones.length + ' contrato' + (renglones.length>1?'s':'') + ' se guardarán y generarán.\nRecibirás el PDF por email.';
+
+  showModal('🖨','¿Guardar y generar?', msg,
     async () => {
       closeModal();
+
+      // Si estamos editando: actualizar y generar ese
+      if (NC_EDITING_ID) {
+        showLoading('Actualizando y generando...');
+        var ru = await api({
+          action: 'updateDatoReal', token: SESSION.token,
+          id: NC_EDITING_ID,
+          datosJSON: JSON.stringify(renglones[0])
+        });
+        if (!ru.ok) { hideLoading(); toast(ru.error,'err'); return; }
+        document.getElementById('loading-msg').textContent = 'Generando contrato...';
+        var rg = await api({ action: 'generarContrato', token: SESSION.token, datosRealesId: NC_EDITING_ID });
+        hideLoading();
+        if (rg.ok) toast('✓ Contrato #' + NC_EDITING_ID + ' generado y enviado por email','ok');
+        else toast(rg.error,'err');
+        NC_EDITING_ID = null;
+        loadStats();
+        setTimeout(() => goTab('contratos'), 800);
+        return;
+      }
+
+      // Modo nuevo: guardar y generar todos
       showLoading('Guardando...');
       const r = await api({
         action: 'saveDatosReales', token: SESSION.token,
@@ -1318,7 +1425,6 @@ async function guardarYGenerar(){
       });
       if (!r.ok) { hideLoading(); toast(r.error,'err'); return; }
 
-      // Generar cada uno
       let ok = 0, fail = 0;
       for (const id of r.ids) {
         document.getElementById('loading-msg').textContent = 'Generando contrato ' + (ok+fail+1) + '/' + r.ids.length + '...';
@@ -1328,6 +1434,7 @@ async function guardarYGenerar(){
       hideLoading();
       if (ok > 0) toast('✓ ' + ok + ' contrato' + (ok>1?'s':'') + ' generado' + (ok>1?'s':'') + ' y enviado' + (ok>1?'s':'') + ' por email','ok');
       if (fail > 0) toast(fail + ' contrato' + (fail>1?'s':'') + ' con error','err');
+      NC_EDITING_ID = null;
       loadStats();
       setTimeout(() => goTab('contratos'), 800);
     }
@@ -1509,7 +1616,7 @@ async function guardarUsuario(){
 // ════════════════════════════════════════════════════════
 async function api(params){
   try{
-    const usePost=['saveDocumento','saveDatosReales','generarContrato','sendPrivEmail','aplicarPHsAlDoc'].includes(params.action);
+    const usePost=['saveDocumento','saveDatosReales','generarContrato','sendPrivEmail','aplicarPHsAlDoc','updateDatoReal'].includes(params.action);
     if(usePost){
       const res=await fetch(API_URL,{method:'POST',redirect:'follow',body:JSON.stringify(params)});
       const txt=await res.text();try{return JSON.parse(txt)}catch{const m=txt.match(/\{[\s\S]*\}/);if(m)return JSON.parse(m[0]);throw new Error('Respuesta inválida')}
