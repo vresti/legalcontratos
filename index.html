@@ -966,23 +966,42 @@ SOLO el JSON array, sin markdown ni explicación.`;
 async function callClaude(prompt) {
   const key = localStorage.getItem('lc_claude_key');
   if(!key) throw new Error('API Key no configurada');
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': key,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true'
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 4000,
-      messages: [{ role: 'user', content: prompt }]
-    })
-  });
-  const data = await res.json();
-  if (data.error) throw new Error(data.error.message);
-  return data.content.map(c => c.text || '').join('');
+  var models = ['claude-sonnet-4-20250514', 'claude-haiku-4-5-20251001'];
+  var lastErr = '';
+  for (var m = 0; m < models.length; m++) {
+    for (var retry = 0; retry < 2; retry++) {
+      try {
+        const res = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': key,
+            'anthropic-version': '2023-06-01',
+            'anthropic-dangerous-direct-browser-access': 'true'
+          },
+          body: JSON.stringify({
+            model: models[m],
+            max_tokens: 4000,
+            messages: [{ role: 'user', content: prompt }]
+          })
+        });
+        const data = await res.json();
+        if (data.error) {
+          lastErr = data.error.message;
+          if (data.error.type === 'overloaded_error') {
+            await new Promise(r => setTimeout(r, 2000));
+            continue;
+          }
+          throw new Error(lastErr);
+        }
+        return data.content.map(c => c.text || '').join('');
+      } catch(e) {
+        lastErr = e.message;
+        if (retry === 0) await new Promise(r => setTimeout(r, 2000));
+      }
+    }
+  }
+  throw new Error('IA no disponible: ' + lastErr);
 }
 
 function renderPropuestaIA() {
