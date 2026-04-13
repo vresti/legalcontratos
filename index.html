@@ -362,6 +362,7 @@ select.finp option{background:var(--bg2)}
             <div style="display:flex;gap:8px;margin-top:10px">
               <button class="fab fab-ghost" onclick="addRenglon()">+ Agregar renglón</button>
               <button class="fab fab-ghost" onclick="removeLastRenglon()">− Quitar último</button>
+              <button class="fab" onclick="abrirPegarPlanilla()" style="background:rgba(6,182,212,.1);color:var(--cyan);border:1px solid rgba(6,182,212,.2)">📋 Pegar desde planilla</button>
             </div>
           </div>
 
@@ -394,6 +395,25 @@ select.finp option{background:var(--bg2)}
         </div>
       </div>
 
+      <!-- Modal pegar desde planilla -->
+      <div class="overlay" id="paste-overlay">
+        <div class="modal" style="max-width:700px;max-height:85vh;overflow-y:auto">
+          <div class="modal-icon">📋</div>
+          <div class="modal-title">Pegar desde planilla</div>
+          <div style="font-size:11px;color:var(--text3);text-align:center;margin-bottom:10px;line-height:1.6">
+            Copiá las filas desde Google Sheets o Excel (sin la fila de encabezados)<br>
+            y pegalas acá. Las columnas deben coincidir con el orden de la tabla.
+          </div>
+          <div id="paste-cols" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px;justify-content:center"></div>
+          <textarea id="paste-area" style="width:100%;min-height:150px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:12px;color:var(--text);font-family:var(--mono);font-size:11px;resize:vertical;outline:none" placeholder="Pegá acá las filas copiadas de tu planilla (Ctrl+V)..."></textarea>
+          <div id="paste-preview" style="margin-top:10px;font-size:11px;color:var(--text3)"></div>
+          <div class="modal-btns" style="margin-top:14px">
+            <button class="mbtn mbtn-cancel" onclick="document.getElementById('paste-overlay').classList.remove('show')">Cancelar</button>
+            <button class="mbtn mbtn-confirm" onclick="aplicarPegado()">📋 Aplicar datos</button>
+          </div>
+        </div>
+      </div>
+
       <!-- ═══ TAB: VISTA PREVIA ═══ -->
       <div id="tab-vista" style="display:none">
         <div id="vista-content">
@@ -415,7 +435,11 @@ select.finp option{background:var(--bg2)}
             <div class="fg"><label class="flbl">Nombre <span class="req">*</span></label><input class="finp" id="doc-nombre" placeholder="Ej: Boleto compraventa"/></div>
             <div class="fg"><label class="flbl">Copias default</label><input class="finp" id="doc-copias" type="number" min="1" value="3" style="max-width:80px"/></div>
           </div>
-          <div class="fg" style="margin-top:8px"><label class="flbl">Placeholder IDs <span class="opt">(separados por ; — o usá el botón IA)</span></label><input class="finp" id="doc-phids" placeholder="1;2;3;4;5 — o dejá que la IA los detecte"/></div>
+          <div style="display:flex;gap:8px;align-items:flex-end;margin-top:8px">
+            <div class="fg" style="flex:1"><label class="flbl">Placeholder IDs <span class="opt">(auto-detectados o manuales)</span></label><input class="finp" id="doc-phids" placeholder="Se completan automáticamente al detectar o analizar con IA" readonly style="background:var(--bg3)"/></div>
+            <button class="tbtn" onclick="detectarPHsEnDoc()" style="margin-bottom:1px;white-space:nowrap">🔍 Detectar PHs</button>
+          </div>
+          <div id="doc-detect-info" style="display:none;margin-top:8px;padding:8px 12px;border-radius:7px;font-size:11px;line-height:1.6"></div>
           <div class="fg" style="margin-top:8px"><label class="flbl">Descripción</label><input class="finp" id="doc-desc" placeholder="Descripción del contrato"/></div>
           <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap">
             <button class="fab fab-blue" onclick="registrarDocumento()">💾 Registrar</button>
@@ -856,6 +880,44 @@ async function registrarDocumento(){
 }
 async function delDoc(id){showModal('✕','¿Eliminar documento?','Se eliminará permanentemente.',async()=>{closeModal();const r=await api({action:'deleteDocumento',token:SESSION.token,id});if(r.ok){toast('Eliminado','inf');loadDocumentos()}else toast(r.error,'err')})}
 
+async function detectarPHsEnDoc(){
+  var docId = document.getElementById('doc-gid').value.trim();
+  if(!docId){ toast('Ingresá el ID del Google Doc primero','err'); return; }
+  showLoading('Escaneando documento...');
+  var r = await api({action:'detectarPHsEnDoc',token:SESSION.token,docId:docId});
+  hideLoading();
+  if(!r.ok){ toast(r.error,'err'); return; }
+
+  // Auto-completar el campo de IDs
+  document.getElementById('doc-phids').value = r.idsStr;
+
+  // Mostrar info
+  var info = document.getElementById('doc-detect-info');
+  var html = '';
+  if(r.matcheados && r.matcheados.length > 0){
+    html += '<div style="color:var(--green);margin-bottom:4px">✓ <strong>' + r.matcheados.length + '</strong> placeholders reconocidos:</div>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">';
+    r.matcheados.forEach(function(m){
+      html += '<span style="font-size:9px;padding:2px 6px;background:var(--greenbg);border:1px solid rgba(34,197,94,.2);border-radius:4px;color:var(--green);font-family:var(--mono)">' + esc(m.codigo) + '</span>';
+    });
+    html += '</div>';
+  }
+  if(r.sinMatch && r.sinMatch.length > 0){
+    html += '<div style="color:var(--amber);margin-bottom:4px">⚠ <strong>' + r.sinMatch.length + '</strong> placeholders en el doc pero NO en el catálogo:</div>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:4px">';
+    r.sinMatch.forEach(function(s){
+      html += '<span style="font-size:9px;padding:2px 6px;background:var(--amberbg);border:1px solid rgba(245,158,11,.2);border-radius:4px;color:var(--amber);font-family:var(--mono)">' + esc(s) + '</span>';
+    });
+    html += '</div>';
+    html += '<div style="font-size:10px;color:var(--text3);margin-top:4px">Podés agregarlos en 🔧 Placeholders → Contratos, o la IA los creará automáticamente.</div>';
+  }
+  info.innerHTML = html;
+  info.style.display = 'block';
+  info.style.background = r.sinMatch.length > 0 ? 'var(--bg2)' : 'var(--greenbg)';
+  info.style.border = '1px solid ' + (r.sinMatch.length > 0 ? 'var(--border)' : 'rgba(34,197,94,.2)');
+
+  toast('✓ ' + r.mensaje, 'ok');
+}
 // ════════════════════════════════════════════════════════
 //  IA: ANÁLISIS DE PLACEHOLDERS
 // ════════════════════════════════════════════════════════
@@ -923,7 +985,16 @@ async function analizarConIA(){
     fin: resaltados[i] ? resaltados[i].fin : 0,
     parrafo: resaltados[i] ? resaltados[i].parrafo : 0,
     aprobado: true
-  }));
+  })).filter(function(p) {
+    // PROTECCIÓN 4 (frontend): descartar textos que ya son placeholders
+    var txt = p.textoOriginal || p.texto || '';
+    return !(txt.indexOf('{{') >= 0 && txt.indexOf('}}') >= 0);
+  });
+
+  if (!IA_PROPUESTA.length) {
+    toast('Todos los textos resaltados ya fueron procesados. No hay nuevos campos para asignar.','inf');
+    return;
+  }
 
   renderPropuestaIA();
 }
@@ -944,9 +1015,10 @@ Para CADA texto resaltado:
 2. Si NO hay match → sugerí un placeholder NUEVO con formato {{GRUPO_CAMPO}} donde GRUPO es una categoría (COMPRADOR, VENDEDOR, INMUEBLE, OPERACION, GARANTE, TESTIGO, etc.)
 
 IMPORTANTE:
+- Si un texto resaltado YA TIENE formato de placeholder (contiene {{ y }}) → IGNORALO COMPLETAMENTE, no lo incluyas en el resultado. Ya fue procesado en una pasada anterior.
 - Usá el contexto para desambiguar (ej: "Buenos Aires" puede ser localidad del comprador o del vendedor según el contexto)
 - Los placeholders nuevos deben seguir la convención {{GRUPO_CAMPO}} en MAYÚSCULAS
-- Cada texto resaltado DEBE tener una propuesta
+- Cada texto resaltado que NO sea un placeholder existente DEBE tener una propuesta
 
 PLACEHOLDERS EXISTENTES:
 ${phList || '(ninguno cargado)'}
@@ -1276,6 +1348,64 @@ function removeLastRenglon(){
   NC_RENGLONES--;
 }
 
+// ── Pegar desde planilla (Gsheets / Excel) ──
+function abrirPegarPlanilla(){
+  if(!NC_PLACEHOLDERS.length){ toast('Seleccioná un documento primero','err'); return; }
+  var colsHtml = NC_PLACEHOLDERS.map(function(ph, i){
+    var label = ph.etiquetaCustom || ph.etiqueta || ph.codigo;
+    return '<span style="font-size:9px;padding:2px 6px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--cyan);font-family:var(--mono)">'+(i+1)+'. '+esc(label)+'</span>';
+  }).join('');
+  document.getElementById('paste-cols').innerHTML = colsHtml;
+  document.getElementById('paste-area').value = '';
+  document.getElementById('paste-preview').innerHTML = '';
+  document.getElementById('paste-overlay').classList.add('show');
+  var area = document.getElementById('paste-area');
+  area.oninput = function(){
+    var filas = parsePegado(area.value);
+    var prev = document.getElementById('paste-preview');
+    if(!filas.length){
+      prev.innerHTML = '<span style="color:var(--text3)">Pegá datos para ver la vista previa...</span>';
+    } else {
+      prev.innerHTML = '<span style="color:var(--green)">✓ '+filas.length+' fila'+(filas.length>1?'s':'')+' con '+filas[0].length+' columna'+(filas[0].length>1?'s':'')+'</span>';
+      if(filas[0].length !== NC_PLACEHOLDERS.length)
+        prev.innerHTML += '<br><span style="color:var(--amber)">⚠ Se esperan '+NC_PLACEHOLDERS.length+' columnas, se detectaron '+filas[0].length+'</span>';
+    }
+  };
+  setTimeout(function(){ area.focus(); }, 150);
+}
+
+function parsePegado(texto){
+  if(!texto || !texto.trim()) return [];
+  var lineas = texto.trim().split('\n');
+  var filas = [];
+  for(var i=0;i<lineas.length;i++){
+    var linea = lineas[i].trim();
+    if(!linea) continue;
+    filas.push(linea.split('\t'));
+  }
+  return filas;
+}
+
+function aplicarPegado(){
+  var filas = parsePegado(document.getElementById('paste-area').value);
+  if(!filas.length){ toast('No hay datos para pegar','err'); return; }
+  document.getElementById('nc-tbody').innerHTML = '';
+  NC_RENGLONES = 0;
+  var aplicadas = 0;
+  for(var f=0;f<filas.length;f++){
+    addRenglon();
+    var row = document.getElementById('nc-row-'+NC_RENGLONES);
+    if(!row) continue;
+    var inputs = row.querySelectorAll('input[data-codigo]');
+    for(var c=0;c<inputs.length&&c<filas[f].length;c++){
+      inputs[c].value = filas[f][c].trim();
+    }
+    aplicadas++;
+  }
+  document.getElementById('paste-overlay').classList.remove('show');
+  toast('✓ '+aplicadas+' fila'+(aplicadas>1?'s':'')+' pegada'+(aplicadas>1?'s':''),'ok');
+}
+
 function recogerRenglones(){
   const renglones = [];
   for (let i = 1; i <= NC_RENGLONES; i++) {
@@ -1463,100 +1593,196 @@ async function guardarYGenerar(){
 // ════════════════════════════════════════════════════════
 //  ACCIONES DESDE MIS CONTRATOS
 // ════════════════════════════════════════════════════════
-async function verContrato(id){
-  showLoading('Cargando contrato...');
-  // Cargar dato real
-  const r = await api({action:'getDatoReal',token:SESSION.token,id});
-  if(!r.ok){hideLoading();toast(r.error,'err');return;}
-  const item = r.item;
-  let datos = {};
-  try { datos = JSON.parse(item.datosJSON || '{}'); } catch(e) {}
+var PREVIEW_ITEMS = [];   // todos los registros del mismo documento
+var PREVIEW_IDX = 0;      // índice actual
+var PREVIEW_HTML = '';     // HTML del template
+var PREVIEW_STYLES = '';   // estilos del template
+var PREVIEW_DOC = null;    // info del documento
+var PREVIEW_PHS = [];      // placeholders
 
-  // Cargar documento para obtener nombre y placeholders
-  const r2 = await api({action:'getDocumento',token:SESSION.token,id:item.documentoId});
+async function verContrato(id){
+  showLoading('Cargando contrato y template...');
+
+  // 1. Cargar dato real
+  var r = await api({action:'getDatoReal',token:SESSION.token,id:id});
+  if(!r.ok){hideLoading();toast(r.error,'err');return;}
+  var item = r.item;
+
+  // 2. Cargar documento + placeholders
+  var r2 = await api({action:'getDocumento',token:SESSION.token,id:item.documentoId});
+  if(!r2.ok){hideLoading();toast(r2.error,'err');return;}
+  PREVIEW_DOC = r2.doc;
+  PREVIEW_PHS = r2.placeholders || [];
+
+  // 3. Cargar HTML del template
+  var r3 = await api({action:'getDocHTML',token:SESSION.token,docId:PREVIEW_DOC.googleDocId});
+  if(!r3.ok){
+    hideLoading();
+    // Fallback: mostrar vista de datos sin preview HTML
+    verContratoSinHTML(item, r2);
+    return;
+  }
+  PREVIEW_HTML = r3.html;
+  PREVIEW_STYLES = r3.styles;
+
+  // 4. Cargar todos los registros del mismo documento (para navegación)
+  var r4 = await api({action:'getDatosReales',token:SESSION.token,documentoId:String(item.documentoId),estado:'TODOS'});
   hideLoading();
 
-  const docNombre = r2.ok ? r2.doc.nombre : 'Documento #'+item.documentoId;
-  const placeholders = r2.ok ? (r2.placeholders||[]) : [];
+  PREVIEW_ITEMS = [];
+  PREVIEW_IDX = 0;
+  if(r4.ok && r4.items.length > 0){
+    // Cargar JSON de cada uno
+    for(var i = 0; i < r4.items.length; i++){
+      var it = r4.items[i];
+      // Si ya tenemos el JSON completo del item actual, usarlo
+      if(parseInt(it.id) === parseInt(id)){
+        it.datosJSON = item.datosJSON;
+      }
+      PREVIEW_ITEMS.push(it);
+      if(parseInt(it.id) === parseInt(id)) PREVIEW_IDX = i;
+    }
+  } else {
+    PREVIEW_ITEMS = [{id:item.id, estado:item.estado, fecha:item.fecha, datosJSON:item.datosJSON, hash:item.hash}];
+  }
 
-  // Agrupar datos por grupo
-  const grupos = {};
-  placeholders.forEach(ph => {
-    const g = ph.grupo || 'GENERAL';
-    if (!grupos[g]) grupos[g] = [];
-    grupos[g].push(ph);
-  });
+  // 5. Cargar JSON faltantes
+  for(var j = 0; j < PREVIEW_ITEMS.length; j++){
+    if(!PREVIEW_ITEMS[j].datosJSON){
+      var rd = await api({action:'getDatoReal',token:SESSION.token,id:PREVIEW_ITEMS[j].id});
+      if(rd.ok) PREVIEW_ITEMS[j].datosJSON = rd.item.datosJSON;
+    }
+  }
 
-  // Badge de estado
-  const badgeClass = {'BORRADOR':'badge-borr','LISTO':'badge-listo','IMPRESO':'badge-imp'}[item.estado]||'badge-borr';
+  renderPreviewNav();
+  goTab('vista');
+}
 
-  // Construir vista
-  let html = '';
+function renderPreviewNav(){
+  var item = PREVIEW_ITEMS[PREVIEW_IDX];
+  if(!item) return;
 
-  // Header
-  html += '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px;padding-bottom:16px;border-bottom:1px solid var(--border)">';
-  html += '<div>';
-  html += '<div style="font-family:var(--mono);font-size:20px;font-weight:700;color:var(--text)">Contrato #'+item.id+'</div>';
-  html += '<div style="font-size:14px;font-weight:600;color:var(--text2);margin-top:2px">'+esc(docNombre)+'</div>';
-  html += '<div style="font-size:11px;color:var(--text3);margin-top:4px;line-height:1.7">';
-  html += 'Cargado: '+esc(item.fecha)+' · Renglón: '+item.renglon;
-  if(item.ordenGlobal) html += ' · Orden: '+item.ordenGlobal;
-  html += '</div></div>';
+  var datos = {};
+  try { datos = JSON.parse(item.datosJSON || '{}'); } catch(e) {}
+
+  var total = PREVIEW_ITEMS.length;
+  var num = PREVIEW_IDX + 1;
+  var badgeClass = {'BORRADOR':'badge-borr','LISTO':'badge-listo','IMPRESO':'badge-imp'}[item.estado]||'badge-borr';
+
+  // Hacer el merge local: reemplazar {{PH}} en el HTML
+  var mergedHTML = PREVIEW_HTML;
+  var keys = Object.keys(datos);
+  for(var k = 0; k < keys.length; k++){
+    var phKey = keys[k];
+    var phVal = datos[phKey] || '';
+    // Reemplazar en HTML (el PH puede estar con o sin entities)
+    var escaped = phKey.replace(/\{/g, '\\{').replace(/\}/g, '\\}');
+    mergedHTML = mergedHTML.replace(new RegExp(escaped, 'g'), esc(phVal));
+    // También reemplazar versión con HTML entities &#123;&#123;...&#125;&#125;
+    var entityKey = phKey.replace(/\{\{/g, '\\{\\{').replace(/\}\}/g, '\\}\\}');
+  }
+
+  // Reemplazar globales conocidos
+  var ahora = new Date();
+  var fechaHoy = ('0'+ahora.getDate()).slice(-2)+'/'+('0'+(ahora.getMonth()+1)).slice(-2)+'/'+ahora.getFullYear();
+  var horaHoy = ('0'+ahora.getHours()).slice(-2)+':'+('0'+ahora.getMinutes()).slice(-2);
+  mergedHTML = mergedHTML.replace(/\{\{FECHA_HOY\}\}/g, fechaHoy);
+  mergedHTML = mergedHTML.replace(/\{\{HORA\}\}/g, horaHoy);
+  mergedHTML = mergedHTML.replace(/\{\{COPIAS_NUMERO\}\}/g, String(PREVIEW_DOC.copiasDefault||3));
+
+  // Limpiar comentario PH si quedó
+  mergedHTML = mergedHTML.replace(/<!--\s*LEGALCONTRATOS:PH:[^>]*-->/g, '');
+
+  // Resaltar PHs no reemplazados
+  mergedHTML = mergedHTML.replace(/(\{\{[A-Z_]+\}\})/g, '<span style="background:#ff000030;color:#ef4444;padding:0 3px;border-radius:3px;font-family:monospace;font-size:0.9em">$1</span>');
+
+  // Construir la vista
+  var html = '';
+
+  // Navegador
+  html += '<div style="display:flex;align-items:center;justify-content:space-between;padding-bottom:14px;margin-bottom:14px;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:10px">';
+  html += '<div style="display:flex;align-items:center;gap:12px">';
+  html += '<button class="tbtn" onclick="prevPreview()" ' + (num<=1?'disabled style="opacity:.3"':'') + '>◄</button>';
+  html += '<span style="font-family:var(--mono);font-size:14px;font-weight:700;color:var(--text)">Registro ' + num + ' de ' + total + '</span>';
+  html += '<button class="tbtn" onclick="nextPreview()" ' + (num>=total?'disabled style="opacity:.3"':'') + '>►</button>';
+  html += '</div>';
+
   html += '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">';
-  html += '<span class="badge '+badgeClass+'"><span class="badge-dot"></span>'+item.estado+'</span>';
+  html += '<span class="badge ' + badgeClass + '"><span class="badge-dot"></span>' + (item.estado||'') + '</span>';
+  html += '<span style="font-family:var(--mono);font-size:10px;color:var(--text3)">#' + item.id + '</span>';
   if(item.estado==='BORRADOR'){
-    html += '<button class="fab fab-green" onclick="generarUno('+id+')" style="padding:7px 14px;font-size:11px">🖨 Generar definitivo</button>';
+    html += '<button class="fab fab-green" onclick="generarUno(' + item.id + ')" style="padding:6px 12px;font-size:11px">🖨 Generar</button>';
+    html += '<button class="fab" onclick="editarContrato(' + item.id + ')" style="padding:6px 12px;font-size:11px;background:var(--bluebg);color:var(--blue);border:1px solid rgba(59,130,246,.2)">✏️ Editar</button>';
   }
-  if(item.hash){
-    html += '<span style="font-size:10px;color:var(--text3);font-family:var(--mono)">🔐 '+esc(item.hash.slice(0,20))+'...</span>';
-  }
-  html += '<button class="fab fab-ghost" onclick="goTab(\'contratos\')" style="padding:7px 14px;font-size:11px">← Volver</button>';
+  if(item.hash) html += '<span style="font-size:9px;color:var(--text3);font-family:var(--mono)">🔐 ' + esc(String(item.hash).slice(0,16)) + '...</span>';
+  html += '<button class="tbtn" onclick="toggleDatosPanel()">📋 Datos</button>';
+  html += '<button class="fab fab-ghost" onclick="goTab(\'contratos\')" style="padding:6px 12px;font-size:11px">← Volver</button>';
   html += '</div></div>';
 
-  // Datos agrupados
-  for (const [grupo, phs] of Object.entries(grupos)) {
-    html += '<div style="margin-bottom:16px">';
-    html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">';
-    html += '<span class="grupo-chip">'+esc(grupo)+'</span></div>';
-    html += '<div style="background:var(--bg1);border:1px solid var(--border);border-radius:10px;overflow:hidden">';
-    html += '<table class="tbl"><tbody>';
-    phs.forEach(ph => {
-      const val = datos[ph.codigo] || '';
-      const isEmpty = !val;
-      html += '<tr>';
-      html += '<td style="width:200px;font-size:10px;color:var(--text3)">'+esc(ph.etiqueta || ph.codigo)+'</td>';
-      html += '<td style="font-family:var(--mono);font-size:10px;color:var(--cyan);width:220px">'+esc(ph.codigo)+'</td>';
-      html += '<td style="font-weight:600;color:'+(isEmpty?'var(--text3)':'var(--text)')+'">'+(isEmpty?'<em style="font-weight:400">— vacío —</em>':esc(val))+'</td>';
-      html += '</tr>';
+  // Panel de datos colapsable
+  html += '<div id="datos-panel" style="display:none;margin-bottom:14px;background:var(--bg1);border:1px solid var(--border);border-radius:10px;padding:14px;max-height:300px;overflow-y:auto">';
+  var grupos = {};
+  PREVIEW_PHS.forEach(function(ph){ var g=ph.grupo||'GENERAL'; if(!grupos[g])grupos[g]=[]; grupos[g].push(ph); });
+  for(var grupo in grupos){
+    html += '<div style="margin-bottom:8px"><span class="grupo-chip">' + esc(grupo) + '</span></div>';
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;margin-bottom:10px;font-size:11px">';
+    grupos[grupo].forEach(function(ph){
+      var val = datos[ph.codigo] || '';
+      html += '<div style="color:var(--text3)">' + esc(ph.etiqueta||ph.codigo) + '</div>';
+      html += '<div style="color:' + (val?'var(--text)':'var(--text3)') + ';font-weight:' + (val?'600':'400') + '">' + (val?esc(val):'—') + '</div>';
+    });
+    html += '</div>';
+  }
+  html += '</div>';
+
+  // Preview del contrato mergeado
+  html += '<div style="background:#fff;border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,.3);overflow:hidden">';
+  html += '<div style="padding:6px 16px;background:#f5f5f5;border-bottom:1px solid #ddd;font-size:10px;color:#888;display:flex;justify-content:space-between">';
+  html += '<span>Vista previa del contrato mergeado</span>';
+  html += '<span>' + esc(PREVIEW_DOC.nombre) + '</span>';
+  html += '</div>';
+  html += '<div style="padding:20px 30px;color:#111;font-size:13px;line-height:1.6">';
+  html += PREVIEW_STYLES;
+  html += mergedHTML;
+  html += '</div></div>';
+
+  document.getElementById('vista-content').innerHTML = html;
+}
+
+function prevPreview(){ if(PREVIEW_IDX > 0){ PREVIEW_IDX--; renderPreviewNav(); } }
+function nextPreview(){ if(PREVIEW_IDX < PREVIEW_ITEMS.length-1){ PREVIEW_IDX++; renderPreviewNav(); } }
+function toggleDatosPanel(){
+  var p = document.getElementById('datos-panel');
+  p.style.display = p.style.display === 'none' ? 'block' : 'none';
+}
+
+// Fallback si no se puede cargar HTML del template
+function verContratoSinHTML(item, r2){
+  var datos = {};
+  try { datos = JSON.parse(item.datosJSON || '{}'); } catch(e) {}
+  var docNombre = r2.ok ? r2.doc.nombre : '?';
+  var placeholders = r2.ok ? (r2.placeholders||[]) : [];
+  var badgeClass = {'BORRADOR':'badge-borr','LISTO':'badge-listo','IMPRESO':'badge-imp'}[item.estado]||'badge-borr';
+
+  var html = '<div style="padding-bottom:14px;margin-bottom:14px;border-bottom:1px solid var(--border)">';
+  html += '<div style="font-family:var(--mono);font-size:20px;font-weight:700;color:var(--text)">Contrato #'+item.id+'</div>';
+  html += '<div style="font-size:14px;color:var(--text2);margin-top:2px">'+esc(docNombre)+'</div>';
+  html += '<span class="badge '+badgeClass+'" style="margin-top:8px"><span class="badge-dot"></span>'+item.estado+'</span>';
+  html += ' <button class="fab fab-ghost" onclick="goTab(\'contratos\')" style="padding:6px 12px;font-size:11px;margin-left:8px">← Volver</button>';
+  html += '</div>';
+
+  // Tabla de datos
+  var grupos = {};
+  placeholders.forEach(function(ph){ var g=ph.grupo||'GENERAL'; if(!grupos[g])grupos[g]=[]; grupos[g].push(ph); });
+  for(var grupo in grupos){
+    html += '<div style="margin-bottom:12px"><span class="grupo-chip">'+esc(grupo)+'</span>';
+    html += '<div style="background:var(--bg1);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-top:6px"><table class="tbl"><tbody>';
+    grupos[grupo].forEach(function(ph){
+      var val = datos[ph.codigo]||'';
+      html += '<tr><td style="width:180px;font-size:10px;color:var(--text3)">'+esc(ph.etiqueta||ph.codigo)+'</td>';
+      html += '<td style="font-weight:600;color:'+(val?'var(--text)':'var(--text3)')+'">'+(val?esc(val):'—')+'</td></tr>';
     });
     html += '</tbody></table></div></div>';
-  }
-
-  // Campos que no tienen placeholder definido (si hay extras en el JSON)
-  const phCodigos = placeholders.map(p => p.codigo);
-  const extras = Object.entries(datos).filter(([k]) => !phCodigos.includes(k));
-  if(extras.length){
-    html += '<div style="margin-bottom:16px">';
-    html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">';
-    html += '<span class="grupo-chip" style="background:var(--bg3);color:var(--text3)">OTROS</span></div>';
-    html += '<div style="background:var(--bg1);border:1px solid var(--border);border-radius:10px;overflow:hidden">';
-    html += '<table class="tbl"><tbody>';
-    extras.forEach(([k,v]) => {
-      html += '<tr><td style="font-family:var(--mono);font-size:10px;color:var(--cyan)">'+esc(k)+'</td>';
-      html += '<td style="font-weight:600">'+esc(v)+'</td></tr>';
-    });
-    html += '</tbody></table></div></div>';
-  }
-
-  // Info de impresión si ya se generó
-  if(item.estado==='IMPRESO'){
-    html += '<div style="background:var(--greenbg);border:1px solid rgba(34,197,94,.2);border-radius:10px;padding:14px;margin-top:12px">';
-    html += '<div style="font-size:11px;color:var(--green);font-weight:600;margin-bottom:6px">✓ Contrato generado</div>';
-    html += '<div style="font-size:11px;color:var(--text2);line-height:1.7">';
-    if(item.fechaImpresion) html += 'Fecha: '+esc(item.fechaImpresion)+'<br>';
-    if(item.copias) html += 'Copias: '+item.copias+' ejemplares<br>';
-    if(item.hash) html += 'Hash: <span style="font-family:var(--mono);font-size:10px">'+esc(item.hash)+'</span>';
-    html += '</div></div>';
   }
 
   document.getElementById('vista-content').innerHTML = html;
