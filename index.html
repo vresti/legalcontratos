@@ -302,6 +302,7 @@ select.finp option{background:var(--bg2)}
       <span class="topbar-title" id="topbar-title">Mis contratos</span>
       <div style="display:flex;align-items:center;gap:12px">
         <button id="btn-abm" onclick="openABM()" style="display:none;padding:6px 13px;border-radius:7px;border:1px solid rgba(59,130,246,.3);background:var(--bluebg);color:var(--blue);font-size:11px;font-weight:600;cursor:pointer">👥 Usuarios</button>
+        <button onclick="configClaude()" style="padding:6px 13px;border-radius:7px;border:1px solid rgba(124,58,237,.3);background:rgba(124,58,237,.1);color:#a78bfa;font-size:11px;font-weight:600;cursor:pointer" title="Configurar API Key de Claude">🤖 IA</button>
         <div id="topbar-right" style="display:flex;gap:7px"></div>
       </div>
     </div>
@@ -402,9 +403,12 @@ select.finp option{background:var(--bg2)}
             <div class="fg"><label class="flbl">Nombre <span class="req">*</span></label><input class="finp" id="doc-nombre" placeholder="Ej: Boleto compraventa"/></div>
             <div class="fg"><label class="flbl">Copias default</label><input class="finp" id="doc-copias" type="number" min="1" value="3" style="max-width:80px"/></div>
           </div>
-          <div class="fg" style="margin-top:8px"><label class="flbl">Placeholder IDs <span class="opt">(separados por ;)</span></label><input class="finp" id="doc-phids" placeholder="1;2;3;4;5 — IDs de PlaceholdersContratos"/></div>
+          <div class="fg" style="margin-top:8px"><label class="flbl">Placeholder IDs <span class="opt">(separados por ; — o usá el botón IA)</span></label><input class="finp" id="doc-phids" placeholder="1;2;3;4;5 — o dejá que la IA los detecte"/></div>
           <div class="fg" style="margin-top:8px"><label class="flbl">Descripción</label><input class="finp" id="doc-desc" placeholder="Descripción del contrato"/></div>
-          <div style="margin-top:10px"><button class="fab fab-blue" onclick="registrarDocumento()">💾 Registrar</button></div>
+          <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap">
+            <button class="fab fab-blue" onclick="registrarDocumento()">💾 Registrar</button>
+            <button class="fab" onclick="analizarConIA()" style="background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;gap:6px">🤖 Analizar con IA — detectar placeholders</button>
+          </div>
         </div>
         <div class="form-section">
           <div class="fsec-lbl">Mis documentos</div>
@@ -510,6 +514,35 @@ select.finp option{background:var(--bg2)}
           <button class="abm-btn abm-btn-cancel" onclick="document.getElementById('abm-form-usr').style.display='none'">Cancelar</button>
           <button class="abm-btn abm-btn-save" onclick="guardarUsuario()">💾 Guardar</button>
         </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal aprobación IA -->
+<div class="abm-overlay" id="ia-overlay">
+  <div class="abm-modal" style="max-width:960px">
+    <div class="abm-head">
+      <span class="abm-title" style="gap:8px">🤖 Propuesta de placeholders</span>
+      <div style="display:flex;gap:8px">
+        <button class="abm-btn abm-btn-save" onclick="aplicarPropuestaIA()" id="btn-aplicar-ia">✓ Aplicar aprobados</button>
+        <button class="abm-close" onclick="document.getElementById('ia-overlay').classList.remove('show')">✕</button>
+      </div>
+    </div>
+    <div class="abm-body">
+      <div style="font-size:11px;color:var(--text3);margin-bottom:14px;line-height:1.6" id="ia-resumen"></div>
+      <div style="overflow-x:auto;border:1px solid var(--border);border-radius:9px;overflow:hidden">
+        <table class="abm-tbl" id="ia-tbl">
+          <thead><tr>
+            <th style="width:30px">✓</th>
+            <th>Texto encontrado</th>
+            <th>Contexto</th>
+            <th>Placeholder propuesto</th>
+            <th>Grupo</th>
+            <th>Tipo</th>
+          </tr></thead>
+          <tbody id="ia-tbody"></tbody>
+        </table>
       </div>
     </div>
   </div>
@@ -810,6 +843,200 @@ async function registrarDocumento(){
   loadDocumentos();
 }
 async function delDoc(id){showModal('✕','¿Eliminar documento?','Se eliminará permanentemente.',async()=>{closeModal();const r=await api({action:'deleteDocumento',token:SESSION.token,id});if(r.ok){toast('Eliminado','inf');loadDocumentos()}else toast(r.error,'err')})}
+
+// ════════════════════════════════════════════════════════
+//  IA: ANÁLISIS DE PLACEHOLDERS
+// ════════════════════════════════════════════════════════
+let IA_PROPUESTA = []; // propuesta activa
+let IA_DOCID = '';     // docId siendo analizado
+
+function configClaude(){
+  const current = localStorage.getItem('lc_claude_key') || '';
+  const masked = current ? current.slice(0,12)+'...'+current.slice(-4) : '(no configurada)';
+  const key = prompt('API Key de Claude\nActual: '+masked+'\n\nPegá la nueva key o dejá vacío para mantener:');
+  if(key === null) return; // canceló
+  if(key.trim()){
+    localStorage.setItem('lc_claude_key', key.trim());
+    toast('✓ API Key guardada en este navegador','ok');
+  }
+}
+
+async function analizarConIA(){
+  const key = localStorage.getItem('lc_claude_key');
+  if(!key){
+    toast('Configurá tu API Key de Claude primero (botón 🤖 IA en la barra superior)','err');
+    return;
+  }
+  const docId = document.getElementById('doc-gid').value.trim();
+  if(!docId){ toast('Ingresá el ID del Google Doc primero','err'); return; }
+  IA_DOCID = docId;
+
+  // Paso 1: Extraer resaltados del documento via GAS
+  showLoading('Leyendo documento y buscando texto resaltado...');
+  const r = await api({action:'extraerResaltados',token:SESSION.token,docId});
+  if(!r.ok){ hideLoading(); toast(r.error,'err'); return; }
+
+  const resaltados = r.resaltados;
+  const phExistentes = r.placeholders;
+
+  // Paso 2: Llamar a Claude para matching inteligente
+  document.getElementById('loading-msg').textContent = '🤖 Analizando con IA...';
+
+  const prompt = buildIAPrompt(resaltados, phExistentes);
+  let iaResult;
+  try {
+    iaResult = await callClaude(prompt);
+  } catch(e) {
+    hideLoading(); toast('Error IA: '+e.message,'err'); return;
+  }
+  hideLoading();
+
+  // Paso 3: Parsear respuesta y mostrar tabla de aprobación
+  let propuestas;
+  try {
+    const clean = iaResult.replace(/```json/g,'').replace(/```/g,'').trim();
+    propuestas = JSON.parse(clean);
+  } catch(e) {
+    toast('Error parseando respuesta de IA','err');
+    console.error('IA raw:', iaResult);
+    return;
+  }
+
+  // Enriquecer con datos originales
+  IA_PROPUESTA = propuestas.map((p, i) => ({
+    ...p,
+    textoOriginal: resaltados[i] ? resaltados[i].texto : p.texto,
+    contexto: resaltados[i] ? resaltados[i].contexto : '',
+    inicio: resaltados[i] ? resaltados[i].inicio : 0,
+    fin: resaltados[i] ? resaltados[i].fin : 0,
+    parrafo: resaltados[i] ? resaltados[i].parrafo : 0,
+    aprobado: true
+  }));
+
+  renderPropuestaIA();
+}
+
+function buildIAPrompt(resaltados, phExistentes) {
+  let phList = phExistentes.map(p =>
+    'ID:'+p.id+' | '+p.codigo+' | Grupo:'+p.grupo+' | '+p.etiqueta
+  ).join('\n');
+
+  let resList = resaltados.map((r, i) =>
+    (i+1)+'. Texto: "'+r.texto+'" — Contexto: "'+r.contexto+'"'
+  ).join('\n');
+
+  return `Sos un asistente legal argentino experto en contratos. Te paso textos resaltados de un contrato con su contexto (5 palabras antes y después entre corchetes), y la lista de placeholders existentes en el sistema.
+
+Para CADA texto resaltado:
+1. Si hay un placeholder existente que matchea semánticamente → usá ese (devolvé su ID y código)
+2. Si NO hay match → sugerí un placeholder NUEVO con formato {{GRUPO_CAMPO}} donde GRUPO es una categoría (COMPRADOR, VENDEDOR, INMUEBLE, OPERACION, GARANTE, TESTIGO, etc.)
+
+IMPORTANTE:
+- Usá el contexto para desambiguar (ej: "Buenos Aires" puede ser localidad del comprador o del vendedor según el contexto)
+- Los placeholders nuevos deben seguir la convención {{GRUPO_CAMPO}} en MAYÚSCULAS
+- Cada texto resaltado DEBE tener una propuesta
+
+PLACEHOLDERS EXISTENTES:
+${phList || '(ninguno cargado)'}
+
+TEXTOS RESALTADOS:
+${resList}
+
+Respondé SOLO con un JSON array. Cada objeto:
+{"texto":"texto original","codigo":"{{COMPRADOR_NOMBRE}}","grupo":"COMPRADOR","etiqueta":"Nombre y Apellido","tipo":"texto","phId":1,"esNuevo":false}
+
+Si es nuevo: phId=null, esNuevo=true.
+Si matchea existente: phId=numero, esNuevo=false.
+
+SOLO el JSON array, sin markdown ni explicación.`;
+}
+
+async function callClaude(prompt) {
+  const key = localStorage.getItem('lc_claude_key');
+  if(!key) throw new Error('API Key no configurada');
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': key,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 4000,
+      messages: [{ role: 'user', content: prompt }]
+    })
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message);
+  return data.content.map(c => c.text || '').join('');
+}
+
+function renderPropuestaIA() {
+  const tbody = document.getElementById('ia-tbody');
+  tbody.innerHTML = IA_PROPUESTA.map((p, i) => {
+    const nuevoTag = p.esNuevo
+      ? '<span style="font-size:8px;background:var(--amberbg);color:var(--amber);padding:1px 6px;border-radius:4px;font-family:var(--mono)">NUEVO</span>'
+      : '<span style="font-size:8px;background:var(--greenbg);color:var(--green);padding:1px 6px;border-radius:4px;font-family:var(--mono)">EXISTE</span>';
+    return `<tr>
+      <td style="text-align:center"><input type="checkbox" checked onchange="IA_PROPUESTA[${i}].aprobado=this.checked" style="width:16px;height:16px;accent-color:var(--blue)"/></td>
+      <td style="font-weight:600;color:var(--text)">${esc(p.textoOriginal || p.texto)}</td>
+      <td style="font-size:10px;color:var(--text3);max-width:200px;overflow:hidden;text-overflow:ellipsis">${esc(p.contexto)}</td>
+      <td style="font-family:var(--mono);font-size:10px;color:var(--cyan)">${nuevoTag} <input class="abm-inp" value="${esc(p.codigo)}" onchange="IA_PROPUESTA[${i}].codigo=this.value" style="display:inline;width:auto;min-width:180px;font-family:var(--mono);font-size:10px;color:var(--cyan)"/></td>
+      <td><input class="abm-inp" value="${esc(p.grupo)}" onchange="IA_PROPUESTA[${i}].grupo=this.value" style="width:100px;text-transform:uppercase"/></td>
+      <td style="font-size:10px">${esc(p.tipo||'texto')}</td>
+    </tr>`;
+  }).join('');
+
+  const total = IA_PROPUESTA.length;
+  const nuevos = IA_PROPUESTA.filter(p => p.esNuevo).length;
+  const existentes = total - nuevos;
+  document.getElementById('ia-resumen').innerHTML =
+    'Se encontraron <strong style="color:var(--text)">' + total + '</strong> textos resaltados. ' +
+    '<strong style="color:var(--green)">' + existentes + '</strong> matchearon con placeholders existentes, ' +
+    '<strong style="color:var(--amber)">' + nuevos + '</strong> son nuevos.' +
+    '<br>Revisá la propuesta, editá lo que necesites, y hacé click en "Aplicar aprobados".';
+
+  document.getElementById('ia-overlay').classList.add('show');
+}
+
+async function aplicarPropuestaIA() {
+  const aprobados = IA_PROPUESTA.filter(p => p.aprobado && p.codigo);
+  if(!aprobados.length){ toast('No hay items aprobados','err'); return; }
+
+  document.getElementById('ia-overlay').classList.remove('show');
+  showLoading('Aplicando ' + aprobados.length + ' placeholders al documento...');
+
+  const reemplazos = aprobados.map(p => ({
+    textoOriginal: p.textoOriginal || p.texto,
+    codigo: p.codigo,
+    grupo: p.grupo || 'GENERAL',
+    etiqueta: p.etiqueta || p.texto,
+    tipo: p.tipo || 'texto',
+    alias: p.grupo ? 'Datos del ' + p.grupo.toLowerCase() : '',
+    phId: p.phId || null,
+    esNuevo: p.esNuevo,
+    inicio: p.inicio || 0
+  }));
+
+  const r = await api({
+    action: 'aplicarPHsAlDoc',
+    token: SESSION.token,
+    docId: IA_DOCID,
+    reemplazos: JSON.stringify(reemplazos)
+  });
+  hideLoading();
+
+  if(!r.ok){ toast(r.error,'err'); return; }
+
+  // Auto-completar el campo de PlaceholderIDs
+  document.getElementById('doc-phids').value = r.idsStr;
+  toast('✓ ' + r.mensaje, 'ok');
+
+  // Recargar placeholders
+  loadPHContratos();
+}
 
 // ════════════════════════════════════════════════════════
 //  DATOS REALES (Mis contratos)
@@ -1208,7 +1435,7 @@ async function guardarUsuario(){
 // ════════════════════════════════════════════════════════
 async function api(params){
   try{
-    const usePost=['saveDocumento','saveDatosReales','generarContrato','sendPrivEmail'].includes(params.action);
+    const usePost=['saveDocumento','saveDatosReales','generarContrato','sendPrivEmail','aplicarPHsAlDoc'].includes(params.action);
     if(usePost){
       const res=await fetch(API_URL,{method:'POST',redirect:'follow',body:JSON.stringify(params)});
       const txt=await res.text();try{return JSON.parse(txt)}catch{const m=txt.match(/\{[\s\S]*\}/);if(m)return JSON.parse(m[0]);throw new Error('Respuesta inválida')}
