@@ -1412,28 +1412,16 @@ function aplicarPegado(){
   toast('✓ '+aplicadas+' fila'+(aplicadas>1?'s':'')+' pegada'+(aplicadas>1?'s':''),'ok');
 }
 
-function crearPlanilla(){
+async function crearPlanilla(){
   if(!NC_PLACEHOLDERS.length){ toast('Seleccioná un documento primero','err'); return; }
-  // Generar CSV con encabezados amigables
-  var headers = NC_PLACEHOLDERS.map(function(ph){
-    var label = ph.etiquetaCustom || ph.etiqueta || ph.codigo;
-    // Escapar comillas para CSV
-    return '"' + label.replace(/"/g, '""') + '"';
-  });
-  var csvContent = headers.join(',') + '\n';
-  // Agregar una fila vacía de ejemplo
-  csvContent += NC_PLACEHOLDERS.map(function(){ return '""'; }).join(',') + '\n';
-
-  // Descargar
-  var docNombre = NC_DOC ? NC_DOC.nombre.replace(/\s+/g, '_').slice(0, 30) : 'plantilla';
-  var blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8' }); // BOM para Excel
-  var url = URL.createObjectURL(blob);
-  var a = document.createElement('a');
-  a.href = url;
-  a.download = 'Plantilla_' + docNombre + '.csv';
-  a.click();
-  URL.revokeObjectURL(url);
-  toast('✓ Plantilla descargada — abrila en Gsheets o Excel, completá los datos y pegá acá','ok');
+  if(!NC_DOC){ toast('Seleccioná un documento primero','err'); return; }
+  var descripcion = (document.getElementById('nc-descripcion').value || '').trim();
+  showLoading('Creando planilla en Google Sheets...');
+  var r = await api({action:'crearPlanillaGSheet',token:SESSION.token,documentoId:NC_DOC.id,descripcion:descripcion});
+  hideLoading();
+  if(!r.ok){ toast(r.error,'err'); return; }
+  toast('✓ '+r.mensaje,'ok');
+  window.open(r.url,'_blank');
 }
 
 function recogerRenglones(){
