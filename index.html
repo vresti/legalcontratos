@@ -319,7 +319,7 @@ select.finp option{background:var(--bg2)}
           <button class="tbtn" onclick="loadDatosReales()">↺ Actualizar</button>
         </div>
         <div class="tbl-wrap">
-          <table class="tbl"><thead><tr><th>#</th><th>Documento</th><th>Datos principales</th><th>Estado</th><th>Fecha</th><th></th></tr></thead>
+          <table class="tbl"><thead><tr><th>#</th><th>Documento</th><th>Descrip. contrato</th><th>Estado</th><th>Fecha</th><th></th></tr></thead>
           <tbody id="contratos-tbody"><tr><td colspan="6" class="empty-tbl">Cargando...</td></tr></tbody></table>
         </div>
       </div>
@@ -343,6 +343,10 @@ select.finp option{background:var(--bg2)}
             <button class="tbtn" id="nc-btn-info" onclick="toggleNCInfo()" style="display:none;margin-bottom:1px">ℹ️ Ver campos</button>
             <button class="tbtn" id="nc-btn-labels" onclick="openEditLabels()" style="display:none;margin-bottom:1px">✏️ Etiquetas</button>
           </div>
+          <div class="fg" style="margin-top:10px" id="nc-desc-wrap" style="display:none">
+            <label class="flbl">Descripción del contrato <span class="opt">(aparece en Mis Contratos)</span></label>
+            <input class="finp" id="nc-descripcion" placeholder="Ej: Boleto CV Juan Giménez — Depto 28, 9 de Julio 1275"/>
+          </div>
           <!-- Info colapsable de campos -->
           <div id="nc-fields" style="display:none;margin-top:12px;padding:12px;background:var(--bg2);border:1px solid var(--border);border-radius:8px"></div>
         </div>
@@ -359,10 +363,11 @@ select.finp option{background:var(--bg2)}
                 </table>
               </div>
             </div>
-            <div style="display:flex;gap:8px;margin-top:10px">
+            <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
               <button class="fab fab-ghost" onclick="addRenglon()">+ Agregar renglón</button>
               <button class="fab fab-ghost" onclick="removeLastRenglon()">− Quitar último</button>
               <button class="fab" onclick="abrirPegarPlanilla()" style="background:rgba(6,182,212,.1);color:var(--cyan);border:1px solid rgba(6,182,212,.2)">📋 Pegar desde planilla</button>
+              <button class="fab" onclick="crearPlanilla()" style="background:rgba(34,197,94,.1);color:var(--green);border:1px solid rgba(34,197,94,.2)">📊 Crear planilla</button>
             </div>
           </div>
 
@@ -1155,7 +1160,7 @@ async function loadDatosReales(){
       ? '<button class="tact" style="border-color:rgba(34,197,94,.3);color:var(--green)" onclick="generarUno('+d.id+')">🖨 Generar</button>'
       : '<span style="font-size:9px;color:var(--text3)">✓ Generado</span>';
     return `<tr><td class="mono">${d.id}</td><td style="font-weight:600;color:var(--text)">${esc(d.docNombre)}</td>
-    <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;color:var(--text3)">${esc(d.preview)}</td>
+    <td style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:${d.descripcion?'var(--text)':'var(--text3)'}">${esc(d.descripcion || d.preview || '—')}</td>
     <td><span class="badge ${badge}"><span class="badge-dot"></span>${d.estado}</span></td>
     <td>${esc(d.fecha)}</td>
     <td style="white-space:nowrap;display:flex;gap:5px">
@@ -1197,6 +1202,7 @@ async function loadDocSelector(){
 
 async function onDocSelected(){
   NC_EDITING_ID = null; // reset edición
+  document.getElementById('nc-descripcion').value = ''; // limpiar descripción
   const sel = document.getElementById('nc-doc');
   const docId = sel.value;
   if (!docId) {
@@ -1406,8 +1412,33 @@ function aplicarPegado(){
   toast('✓ '+aplicadas+' fila'+(aplicadas>1?'s':'')+' pegada'+(aplicadas>1?'s':''),'ok');
 }
 
+function crearPlanilla(){
+  if(!NC_PLACEHOLDERS.length){ toast('Seleccioná un documento primero','err'); return; }
+  // Generar CSV con encabezados amigables
+  var headers = NC_PLACEHOLDERS.map(function(ph){
+    var label = ph.etiquetaCustom || ph.etiqueta || ph.codigo;
+    // Escapar comillas para CSV
+    return '"' + label.replace(/"/g, '""') + '"';
+  });
+  var csvContent = headers.join(',') + '\n';
+  // Agregar una fila vacía de ejemplo
+  csvContent += NC_PLACEHOLDERS.map(function(){ return '""'; }).join(',') + '\n';
+
+  // Descargar
+  var docNombre = NC_DOC ? NC_DOC.nombre.replace(/\s+/g, '_').slice(0, 30) : 'plantilla';
+  var blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8' }); // BOM para Excel
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'Plantilla_' + docNombre + '.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('✓ Plantilla descargada — abrila en Gsheets o Excel, completá los datos y pegá acá','ok');
+}
+
 function recogerRenglones(){
   const renglones = [];
+  var descripcion = (document.getElementById('nc-descripcion').value || '').trim();
   for (let i = 1; i <= NC_RENGLONES; i++) {
     const tr = document.getElementById('nc-row-' + i);
     if (!tr) continue;
@@ -1420,6 +1451,9 @@ function recogerRenglones(){
       datos[inp.dataset.codigo] = val;
     });
     if (vacio) continue;
+
+    // Agregar descripción
+    if (descripcion) datos._DESCRIPCION_ = descripcion;
 
     // Validar obligatorios
     let falta = false;
@@ -1528,6 +1562,9 @@ async function editarContrato(id){
       if (datos[codigo] !== undefined) inp.value = datos[codigo];
     });
   }
+
+  // 8. Cargar descripción
+  document.getElementById('nc-descripcion').value = datos._DESCRIPCION_ || '';
 
   toast('✏️ Editando borrador #' + id + ' — modificá y guardá','inf');
 }
