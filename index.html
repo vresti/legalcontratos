@@ -1345,6 +1345,133 @@ function addRenglon(){
   });
   tr.innerHTML = cells;
   document.getElementById('nc-tbody').appendChild(tr);
+
+  // Conectar auto-cálculo para campos de OPERACION
+  var rowNum = NC_RENGLONES;
+  var camposCalc = ['{{OPERACION_PRECIO}}','{{OPERACION_ANTICIPO}}','{{OPERACION_CUOTAS}}','{{OPERACION_VALOR_CUOTA}}'];
+  camposCalc.forEach(function(cod){
+    var inp = tr.querySelector('input[data-codigo="'+cod+'"]');
+    if(inp) inp.addEventListener('input', function(){ calcOperacion(rowNum); });
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+//  PUNTOS 8 y 9: VALIDACIÓN ARITMÉTICA + AUTO-CÁLCULO
+// ═══════════════════════════════════════════════════════
+function getRowInput(rowNum, codigo){
+  var row = document.getElementById('nc-row-'+rowNum);
+  return row ? row.querySelector('input[data-codigo="'+codigo+'"]') : null;
+}
+function getRowVal(rowNum, codigo){
+  var inp = getRowInput(rowNum, codigo);
+  return inp ? parseFloat(inp.value) || 0 : 0;
+}
+function setRowVal(rowNum, codigo, val){
+  var inp = getRowInput(rowNum, codigo);
+  if(inp && !document.activeElement.isSameNode(inp)){
+    inp.value = val;
+  }
+}
+
+function calcOperacion(rowNum){
+  var precio   = getRowVal(rowNum, '{{OPERACION_PRECIO}}');
+  var anticipo = getRowVal(rowNum, '{{OPERACION_ANTICIPO}}');
+  var cuotas   = getRowVal(rowNum, '{{OPERACION_CUOTAS}}');
+  var valCuota = getRowVal(rowNum, '{{OPERACION_VALOR_CUOTA}}');
+
+  // Auto-cálculo: SALDO = PRECIO - ANTICIPO
+  if(precio > 0){
+    var saldo = precio - anticipo;
+    setRowVal(rowNum, '{{OPERACION_SALDO}}', saldo > 0 ? saldo : 0);
+  }
+
+  // Auto-cálculo: si hay cuotas y saldo, calcular valor cuota (si el usuario no lo puso)
+  if(cuotas > 0 && precio > 0 && anticipo > 0 && valCuota === 0){
+    var saldoCalc = precio - anticipo;
+    if(saldoCalc > 0) setRowVal(rowNum, '{{OPERACION_VALOR_CUOTA}}', Math.round(saldoCalc / cuotas * 100) / 100);
+  }
+
+  // Auto-cálculo: LETRAS
+  if(precio > 0) setRowVal(rowNum, '{{OPERACION_PRECIO_LETRAS}}', numALetras(precio));
+  if(anticipo > 0) setRowVal(rowNum, '{{OPERACION_ANTICIPO_LETRAS}}', numALetras(anticipo));
+  var saldoFinal = getRowVal(rowNum, '{{OPERACION_SALDO}}');
+  if(saldoFinal > 0) setRowVal(rowNum, '{{OPERACION_SALDO_LETRAS}}', numALetras(saldoFinal));
+
+  // Validación aritmética
+  eliminarWarning(rowNum);
+  if(precio > 0 && anticipo > 0 && cuotas > 0 && valCuota > 0){
+    var totalCalc = anticipo + (cuotas * valCuota);
+    var diff = Math.abs(totalCalc - precio);
+    if(diff > 0.01){
+      mostrarWarning(rowNum,
+        '⚠ Verificar: Anticipo ($'+fmtNum(anticipo)+') + '+cuotas+' cuotas × $'+fmtNum(valCuota)+' = $'+fmtNum(totalCalc)+
+        ' — Precio total: $'+fmtNum(precio)+' — Diferencia: $'+fmtNum(diff)
+      );
+    }
+  }
+}
+
+function mostrarWarning(rowNum, msg){
+  eliminarWarning(rowNum);
+  var row = document.getElementById('nc-row-'+rowNum);
+  if(!row) return;
+  var warn = document.createElement('tr');
+  warn.id = 'nc-warn-'+rowNum;
+  warn.innerHTML = '<td colspan="'+(NC_PLACEHOLDERS.length+1)+'" style="background:rgba(245,158,11,.1);color:var(--amber);font-size:11px;padding:6px 12px;border:1px solid rgba(245,158,11,.2)">'+msg+'</td>';
+  row.parentNode.insertBefore(warn, row.nextSibling);
+}
+
+function eliminarWarning(rowNum){
+  var w = document.getElementById('nc-warn-'+rowNum);
+  if(w) w.remove();
+}
+
+function fmtNum(n){
+  return n.toLocaleString('es-AR', {minimumFractionDigits:0, maximumFractionDigits:2});
+}
+
+// ── Número a letras (español argentino) ──
+function numALetras(n){
+  if(n === 0) return 'cero';
+  if(n < 0) return 'menos ' + numALetras(-n);
+  n = Math.round(n * 100) / 100;
+  var entero = Math.floor(n);
+  var centavos = Math.round((n - entero) * 100);
+  var resultado = _enteroALetras(entero);
+  if(centavos > 0) resultado += ' con ' + _enteroALetras(centavos) + ' centavos';
+  return resultado.charAt(0).toUpperCase() + resultado.slice(1);
+}
+
+function _enteroALetras(n){
+  if(n === 0) return '';
+  var unidades = ['','uno','dos','tres','cuatro','cinco','seis','siete','ocho','nueve','diez',
+    'once','doce','trece','catorce','quince','dieciséis','diecisiete','dieciocho','diecinueve','veinte',
+    'veintiuno','veintidós','veintitrés','veinticuatro','veinticinco','veintiséis','veintisiete','veintiocho','veintinueve'];
+  var decenas = ['','','','treinta','cuarenta','cincuenta','sesenta','setenta','ochenta','noventa'];
+  var centenas = ['','ciento','doscientos','trescientos','cuatrocientos','quinientos','seiscientos','setecientos','ochocientos','novecientos'];
+
+  if(n < 30) return unidades[n];
+  if(n < 100){
+    var d = Math.floor(n/10), u = n%10;
+    return decenas[d] + (u > 0 ? ' y ' + unidades[u] : '');
+  }
+  if(n === 100) return 'cien';
+  if(n < 1000){
+    var c = Math.floor(n/100), r = n%100;
+    return centenas[c] + (r > 0 ? ' ' + _enteroALetras(r) : '');
+  }
+  if(n === 1000) return 'mil';
+  if(n < 1000000){
+    var miles = Math.floor(n/1000), resto = n%1000;
+    var pre = miles === 1 ? 'mil' : _enteroALetras(miles) + ' mil';
+    return pre + (resto > 0 ? ' ' + _enteroALetras(resto) : '');
+  }
+  if(n < 1000000000){
+    var millones = Math.floor(n/1000000), resto2 = n%1000000;
+    var pre2 = millones === 1 ? 'un millón' : _enteroALetras(millones) + ' millones';
+    return pre2 + (resto2 > 0 ? ' ' + _enteroALetras(resto2) : '');
+  }
+  return String(n);
 }
 
 function removeLastRenglon(){
